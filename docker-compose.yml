@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # --- BACKEND SERVICE ---
+  energy-server:
+    build: ./energy-server
+    container_name: energy-server
+    ports:
+      - "8081:8081" # Map host 8081 to container 8081
+    networks:
+      - energy-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- FRONTEND SERVICE ---
+  energy-client:
+    build: ./energy-client
+    container_name: energy-client
+    ports:
+      - "8080:8080" # Map host 8080 to container 8080
+    environment:
+      - APP_BACKEND_URL=http://energy-server:8081/api/facade
+    depends_on:
+      energy-server:
+        condition: service_healthy # Wait until server is up
+    networks:
+      - energy-net
+
+# Define a custom bridge network for internal communication
+networks:
+  energy-net:
+    driver: bridge

@@ -1,0 +1,147 @@
+/* --- RESET & BASE --- */
+:root {
+    --bg-dark: #0f172a;       /* Sfondo pagina */
+    --bg-card: #1e293b;       /* Sfondo card */
+    --accent-blue: #38bdf8;   /* Testo azzurro */
+    --accent-pink: #f472b6;   /* Accento AI */
+    --text-main: #e2e8f0;     /* Testo principale */
+    --text-muted: #94a3b8;    /* Testo secondario */
+    --border: #334155;        /* Bordi */
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    margin: 0;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* --- HEADER --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+h1 { margin: 0; font-size: 1.8rem; color: var(--accent-blue); }
+.subtitle { color: var(--text-muted); font-size: 0.9rem; }
+
+/* UPLOAD FORM */
+.upload-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+input[type="file"] { color: var(--text-muted); font-size: 0.9rem; }
+
+.btn-upload {
+    background-color: #6366f1;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.btn-upload:hover { background-color: #4f46e5; }
+
+/* --- KPI CARDS (GRID SYSTEM) --- */
+.stats-grid {
+    display: grid;
+    /* Magia: crea tante colonne quante ce ne stanno, minimo 250px l'una */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background-color: var(--bg-card);
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.card-label { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+.card-value { font-size: 2.2rem; font-weight: 700; color: #fff; margin-top: 5px; }
+.card-unit { font-size: 1rem; color: var(--text-muted); font-weight: 400; }
+
+/* --- AI INSIGHT BOX --- */
+.ai-box {
+    background: linear-gradient(to right, #1e293b, #1e1b4b); /* Sfumatura leggera */
+    border-left: 6px solid var(--accent-pink);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.ai-content h3 { margin: 0 0 5px 0; color: var(--accent-pink); display: flex; align-items: center; gap: 10px; }
+.ai-prediction { font-size: 1.5rem; font-weight: bold; color: white; }
+
+/* --- DATA TABLE --- */
+.table-container {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden; /* Fondamentale per i bordi */
+}
+
+.table-scroll {
+    overflow-x: auto; /* Scroll orizzontale se necessario */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+thead { background-color: #0f172a; }
+
+th {
+    text-align: left;
+    padding: 15px;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+
+td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+}
+
+tr:last-child td { border-bottom: none; }
+tbody tr:hover { background-color: #334155; } /* Hover row */
+
+/* BADGES */
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+.badge-on { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+.badge-off { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #b91c1c; }
+
+/* MESSAGES */
+.alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+.alert-error { background: #ef4444; color: white; }
+.alert-success { background: #10b981; color: white; }

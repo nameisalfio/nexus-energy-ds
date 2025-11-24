@@ -1,0 +1,22 @@
+# --- Maven Build Artifacts ---
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# --- IDE Settings (IntelliJ / VS Code / Eclipse) ---
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
