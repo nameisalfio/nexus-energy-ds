@@ -1,0 +1,48 @@
+flowchart TD
+    %% Styling
+    classDef browser fill:#ffecd1,stroke:#e67e22,stroke-width:2px;
+    classDef client fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
+    classDef server fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
+    classDef db fill:#fadbd8,stroke:#c0392b,stroke-width:2px;
+
+    subgraph User_Workstation ["User Workstation"]
+        Browser[Browser / User Agent]:::browser
+    end
+
+    subgraph Client_Microservice ["Client Service (Port 8080)"]
+        direction TB
+        FC[FrontendController]:::client
+        GW[EnergyGatewayService]:::client
+        View[Thymeleaf Views]:::client
+        
+        FC -->|Delegates| GW
+        FC -->|Renders| View
+    end
+
+    subgraph Server_Microservice ["Server Service (Port 8081)"]
+        direction TB
+        Facade[EnergyFacadeController]:::server
+        Service[EnergyAnalysisService]:::server
+        Repo[EnergyRepository]:::server
+        DTOs(Shared DTOs):::server
+        
+        Facade -->|Coarse-Grained Call| Service
+        Service -->|CRUD Ops| Repo
+        Service -.->|Maps to| DTOs
+    end
+
+    subgraph Persistence ["Data Layer"]
+        H2[(H2 In-Memory DB)]:::db
+    end
+
+    %% Network Connections
+    Browser ==>|HTTP GET / HTML| FC
+    GW ==>|HTTP REST / JSON| Facade
+    Repo ==>|JDBC / SQL| H2
+
+    %% Annotations
+    note_client[Pattern: BFF & Proxy]
+    note_server[Pattern: Remote Facade & Service Layer]
+    
+    Client_Microservice -.- note_client
+    Server_Microservice -.- note_server
