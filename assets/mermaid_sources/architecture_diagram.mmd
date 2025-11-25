@@ -5,134 +5,120 @@ flowchart TD
     classDef pattern fill:#fce4ec,stroke:#c2185b,stroke-width:1px,stroke-dasharray: 5 5,color:#880e4f
     classDef logging fill:#ffffff,stroke:#fbc02d,stroke-width:2px,color:black
     classDef frontend fill:#61dafb,stroke:#20232a,stroke-width:2px,color:black
- 
+    classDef queue fill:#ffffff,stroke:#7b1fa2,stroke-width:2px,color:black
+    classDef container fill:#f5f5f5,stroke:#666,stroke-width:2px
+
     %% --- FRONTEND ENVIRONMENT ---
     subgraph Browser_Env ["💻 Browser"]
         direction TB
         User((User))
-       
         ReactApp("⚛️ React + TypeScript<br/>"):::frontend
-       
-        %% User interaction
         User ==> ReactApp
     end
- 
+
     %% --- BACKEND ENVIRONMENT ---
     subgraph Docker_Host ["🐳 Docker Environment"]
         direction TB
- 
-        %% --- CLIENT MICROSERVICE (BFF) ---
-        subgraph Client_App ["🟦 Client Service (BFF) : 8080"]
+
+        %% 1. CLIENT SERVICE (Top Layer)
+        subgraph Client_App ["🟦 Client Service : 8080"]
             direction TB
-           
             UI_Controller[API Controller]:::component
             Authenticator[🔐 Token Validation]:::component
             Gateway[EnergyGatewayService]:::component
-            CB_Client[⚡ Circuit Breaker & Timeout]:::pattern
-           
-            %% Link 0
+            CB_Client[⚡ Circuit Breaker]:::pattern
+
             UI_Controller --> Authenticator
-            %% Link 1
             Authenticator --> Gateway
-            %% Link 2
             Gateway --"Protects"--> CB_Client
         end
- 
-        %% --- SERVER MICROSERVICE (CORE) ---
+
+        %% 2. SERVER SERVICE (Middle Layer)
         subgraph Server_App ["🟩 Server Service : 8081"]
             direction TB
-           
             Auth[🔐 Token Validation]:::pattern
             Facade[Remote Facade API]:::pattern
-           
+            
             subgraph Business_Logic ["Business Logic"]
+                direction TB
                 Service[Energy Analysis Service]:::component
                 AI[AI Model Service]:::component
                 Batch[📄 Request Batch Handler]:::pattern
             end
-           
+            
             CB_Database[⚡ Database Circuit Breaker]:::pattern
             Repo[Energy Repository]:::component
-           
-            %% Link 3
-            Auth --> Facade
-            %% Link 4
-            Facade --> Service
-           
-            %% Flussi Logici
-            %% Link 5
-            Service --> AI
-            %% Link 6
-            AI --> LSTM
-            %% Link 7
-            Service --"Batch Insert"--> Batch
             ModelFile{{AI Model .zip}}:::db
-           
-            %% Protezione verso il DB
-            %% Link 8
+
+            Auth --> Facade
+            Facade --> Service
+            Service --> AI
+            Service --"Batch Insert"--> Batch
+            
+            %% Flow AI Interno
+            AI --> LSTM[LSTM Network]:::component
+            LSTM -.->|"Load"| ModelFile
+
+            %% Accesso Dati
             Batch --"Protects"--> CB_Database
-            %% Link 9
             CB_Database --> Repo
         end
- 
-        %% --- DATA SERVICE ---
+
+        %% 3. INFRASTRUCTURE SERVICES (Bottom Layer)
+        %% Li definiamo qui sotto per forzare il layout in basso
+        
+        subgraph Messaging_Service ["📨 Msg Service : 5672"]
+            RabbitMQ[RabbitMQ Queue]:::queue
+        end
+
         subgraph Data_Service ["🗄️ Data Service : 8082"]
             MySQL[(MySQL)]:::db
         end
- 
-        %% --- ELK STACK ---
+
         subgraph ELK_Stack ["🟧 ELK Stack : 5601"]
             direction TB
             Logstash[Logstash]:::logging
             Elasticsearch[Elasticsearch]:::logging
             Kibana[Kibana]:::logging
- 
-            %% Link 10
-            Logstash --"Indexing"--> Elasticsearch
-            %% Link 11
-            Elasticsearch --"Query Data"--> Kibana
+            
+            Logstash --> Elasticsearch --> Kibana
         end
     end
- 
-    %% --- OPERATIONAL DATA FLOWS ---
-    %% Link 12 (Updated for React)
-    ReactApp == "1. HTTP / REST API" ==> UI_Controller
-    %% Link 13
-    CB_Client == "2. REST (JSON) + JWT Token" ==> Auth
-    %% Link 14
-    Repo == "3. JPA / Hibernate" ==> MySQL
-    %% Link 15
-    LSTM -.->|"Load Weights"| ModelFile
- 
-    %% --- LOGGING FLOWS ---
-    %% Link 16
+
+    %% --- CROSS-BOUNDARY CONNECTIONS ---
+    
+    %% Browser -> Client
+    ReactApp == "1. HTTP REST" ==> UI_Controller
+    
+    %% Client -> Server
+    CB_Client == "2. REST JSON" ==> Auth
+    
+    %% Server -> Data
+    Repo == "3. JPA / JDBC" ==> MySQL
+    
+    %% Server -> Messaging (Async)
+    AI -.->|"Publish Anomaly"| RabbitMQ
+
+    %% Logging Flows (Tratteggiati per chiarezza)
     Client_App -.-> |"Logs"| Logstash
-    %% Link 17
     Server_App -.-> |"Logs"| Logstash
-    %% Link 18
-    Data_Service -.-> |"Logs"| Logstash
- 
-    %% --- SUBGRAPH STYLES (COLORI BACKGROUND) ---
-    %% Browser Env
+
+    %% --- LAYOUT OPTIMIZATION (Invisible Links) ---
+    %% Questi link invisibili forzano l'ordine verticale dei container
+    Browser_Env ~~~ Client_App
+    Client_App ~~~ Server_App
+    Server_App ~~~ Data_Service
+    Server_App ~~~ Messaging_Service
+    Server_App ~~~ ELK_Stack
+
+    %% --- STYLES ---
     style Browser_Env fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,stroke-dasharray: 5 5
- 
-    %% Docker Host (Grigio Neutro)
     style Docker_Host fill:#f5f5f5,stroke:#666,stroke-width:2px
-   
-    %% Client (Azzurro Chiaro)
     style Client_App fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-   
-    %% Server (Verde Chiaro)
     style Server_App fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-   
-    %% Data (Arancione Chiaro)
     style Data_Service fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
-   
-    %% ELK (Giallo Chiaro)
+    style Messaging_Service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     style ELK_Stack fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
-   
-    %% Business Logic interna (Bianco per contrasto)
-    style Business_Logic fill:#90EE9,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
- 
-    %% Applicazione stile flussi di log
-    linkStyle 16,17,18 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;
+    style Business_Logic fill:#fffff,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
+
+    linkStyle 13,14 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;
