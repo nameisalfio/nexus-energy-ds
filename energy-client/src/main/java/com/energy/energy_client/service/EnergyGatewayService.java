@@ -24,62 +24,44 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class EnergyGatewayService {
 
-    // Injected from application.properties
     @Value("${app.backend.url}")
-    private String backendUrl;
+    private String baseUrl; // Make sure it is: http://localhost:8081/api/v1
 
-    // The modern Spring HTTP Client
     private final RestClient.Builder restClientBuilder;
 
-    /**
-     * Calls the Backend to retrieve the full dashboard report.
-     * REST Verb: GET
-     */
+    // --- 1. FULL REPORT ---
     public SystemReportDTO getFullReport() {
-        log.info("Calling Backend API: {}/full-report", backendUrl);
-
         return restClientBuilder.build()
                 .get()
-                .uri(backendUrl + "/full-report")
+                .uri(baseUrl + "/full-report")
                 .retrieve()
                 .body(SystemReportDTO.class);
     }
 
-    /**
-     * Uploads a CSV file to the Backend.
-     * REST Verb: POST (Multipart)
-     */
+    // --- 2. UPLOAD CSV ---
     public String uploadCsvFile(MultipartFile file) throws IOException {
-        log.info("Uploading file to Backend: {}", file.getOriginalFilename());
-
-        // Prepare the multipart request body
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new ByteArrayResource(file.getBytes()) {
             @Override
-            public String getFilename() {
-                return file.getOriginalFilename();
-            }
+            public String getFilename() { return file.getOriginalFilename(); }
         });
 
-        // Execute the POST request
         return restClientBuilder.build()
                 .post()
-                .uri(backendUrl + "/ingest-dataset")
+                .uri(baseUrl + "/ingest-dataset")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(body)
                 .retrieve()
                 .body(String.class);
     }
 
-    /**
-     * Retrieves weekly statistics from the Backend.
-     * REST Verb: GET
-     */
+    // --- 3. WEEKLY STATISTICS ---
     public List<WeeklyStatsDTO> getWeeklyStats() {
-    return restClientBuilder.build()
-            .get()
-            .uri(backendUrl + "/stats/weekly")
-            .retrieve()
-            .body(new ParameterizedTypeReference<List<WeeklyStatsDTO>>() {});
+        return restClientBuilder.build()
+                .get()
+                .uri(baseUrl + "/stats/weekly")
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<WeeklyStatsDTO>>() {});
     }
+
 }

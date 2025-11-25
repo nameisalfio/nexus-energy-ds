@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -20,10 +19,73 @@
         <div th:if="${report != null}">
             
             <div class="stats-grid">
-                <div class="card"><div class="card-lbl">Avg Temp</div><div class="card-val" th:text="${#numbers.formatDecimal(report.stats.averageTemperature, 1, 1)} + '°'"></div></div>
-                <div class="card"><div class="card-lbl">Total Energy</div><div class="card-val" th:text="${#numbers.formatDecimal(report.stats.totalEnergyConsumption, 1, 0)}"></div></div>
-                <div class="card"><div class="card-lbl">Peak Load</div><div class="card-val" th:text="${#numbers.formatDecimal(report.stats.peakLoad, 1, 2)}"></div></div>
-                <div class="card"><div class="card-lbl">AI Prediction</div><div class="card-val" style="color:#f472b6;" th:text="${#numbers.formatDecimal(report.aiInsights.predictedLoadNextHour, 1, 2)}"></div></div>
+                <div class="card">
+                    <div class="card-lbl">Avg Temp</div>
+                    <div class="card-val" th:text="${#numbers.formatDecimal(report.stats.averageTemperature, 1, 1)} + '°'"></div>
+                </div>
+                <div class="card">
+                    <div class="card-lbl">Total Energy</div>
+                    <div class="card-val" th:text="${#numbers.formatDecimal(report.stats.totalEnergyConsumption, 1, 0)}"></div>
+                </div>
+                <div class="card">
+                    <div class="card-lbl">Peak Load</div>
+                    <div class="card-val" th:text="${#numbers.formatDecimal(report.stats.peakLoad, 1, 2)}"></div>
+                </div>
+                <div class="card">
+                    <div class="card-lbl">Total Records</div>
+                    <div class="card-val" th:text="${report.stats.totalRecords}"></div>
+                </div>
+            </div>
+
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 25px; margin-bottom: 30px; position: relative; overflow: hidden;">
+                <div th:style="'position: absolute; top:0; left:0; width: 5px; height: 100%; background: ' + (${report.aiInsights.anomalyDetected} ? '#ef4444' : '#10b981')"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0 0 10px 0; color: #fff; display: flex; align-items: center; gap: 10px;">
+                            🧠 AI Digital Twin Analysis
+                            <span th:if="${report.aiInsights.anomalyDetected}" class="badge" style="background: #ef4444; color: white;">ANOMALY</span>
+                            <span th:unless="${report.aiInsights.anomalyDetected}" class="badge" style="background: #10b981; color: white;">NORMAL</span>
+                        </h3>
+                        <p style="color: #94a3b8; margin: 0;" th:text="${report.aiInsights.optimizationSuggestion}">Analysis message...</p>
+                    </div>
+                    
+                    <div style="text-align: right; display: flex; gap: 40px;">
+                        <div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">AI Expected</div>
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #f472b6;" 
+                                    th:text="${#numbers.formatDecimal(report.aiInsights.expectedValue, 1, 2)}">0.00</div>
+                            <div style="color: #f472b6; font-size: 0.8rem;">kWh</div>
+                        </div>
+                        
+                        <div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Real Value</div>
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #fff;" 
+                                    th:text="${#numbers.formatDecimal(report.aiInsights.actualValue, 1, 2)}">0.00</div>
+                            <div style="color: #fff; font-size: 0.8rem;">kWh</div>
+                        </div>
+
+                        <div style="padding-left: 20px; border-left: 1px solid #334155;">
+                            <div style="color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Deviation</div>
+                            <div style="font-size: 1.8rem; font-weight: bold;" 
+                                    th:class="${report.aiInsights.anomalyDetected ? 'text-red' : 'text-green'}"
+                                    th:style="${report.aiInsights.anomalyDetected ? 'color: #ef4444;' : 'color: #10b981;'}"
+                                    th:text="${#numbers.formatDecimal(report.aiInsights.deviationPercent, 1, 1)} + '%'">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 30px;">
+                <h3 style="color: var(--accent);">📊 Weekly Analysis</h3>
+                <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;">
+                    <div th:each="stat : ${weeklyStats}" 
+                            style="background: #1e293b; padding: 15px; border-radius: 8px; flex: 1; min-width: 100px; text-align: center; border: 1px solid #334155;">
+                        <div style="color: #94a3b8; font-size: 0.8rem;" th:text="${stat.day}">MONDAY</div>
+                        <div style="font-weight: bold; color: #38bdf8;" 
+                                th:text="${#numbers.formatDecimal(stat.avgConsumption, 1, 1)}">75.5</div>
+                    </div>
+                </div>
             </div>
 
             <h3 style="color: var(--accent);">Live Data Log (Last 100 Records)</h3>
@@ -51,7 +113,8 @@
                             <td th:text="${#numbers.formatDecimal(row.temperature, 1, 1)}"></td>
                             <td th:text="${#numbers.formatDecimal(row.humidity, 1, 0)}"></td>
                             
-                            <td th:text="${#numbers.formatDecimal(row.squareFootage, 1, 0)}"></td> <td th:text="${row.occupancy}"></td>
+                            <td th:text="${#numbers.formatDecimal(row.squareFootage, 1, 0)}"></td> 
+                            <td th:text="${row.occupancy}"></td>
                             
                             <td><span th:class="${row.hvacStatus == 'On' ? 'badge b-on' : 'badge b-off'}" th:text="${row.hvacStatus}"></span></td>
                             <td><span th:class="${row.lightingStatus == 'On' ? 'badge b-on' : 'badge b-off'}" th:text="${row.lightingStatus}"></span></td>
@@ -69,20 +132,9 @@
             </div>
         </div>
 
-        <div style="margin-bottom: 30px;">
-            <h3>📊 Weekly Analysis</h3>
-            <div style="display: flex; gap: 10px;">
-                <div th:each="stat : ${weeklyStats}" 
-                     style="background: #1e293b; padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 1px solid #334155;">
-                    <div style="color: #94a3b8; font-size: 0.8rem;" th:text="${stat.day}">MONDAY</div>
-                    <div style="font-weight: bold; color: #38bdf8;" 
-                         th:text="${#numbers.formatDecimal(stat.avgConsumption, 1, 1)}">75.5</div>
-                </div>
-            </div>
-        </div>
-
         <div th:if="${report == null}" style="text-align: center; padding: 50px;">
             <h2>Waiting for Backend...</h2>
+            <p style="color: #94a3b8;">Make sure the server is running and data is loaded.</p>
         </div>
     </div>
 </body>

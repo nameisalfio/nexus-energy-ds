@@ -25,16 +25,13 @@ public class FrontendController {
     @GetMapping("/")
     public String showDashboard(Model model) {
         try {
-            // 1. Fetch data from the remote server
             SystemReportDTO report = gatewayService.getFullReport();
             List<WeeklyStatsDTO> weeklyStats = gatewayService.getWeeklyStats();
             
-            // 2. Pass data to Thymeleaf view
             model.addAttribute("report", report);
             model.addAttribute("weeklyStats", weeklyStats);
             
         } catch (Exception e) {
-            // Handle connection errors (e.g., Server is down)
             model.addAttribute("error", "Backend Server is unreachable: " + e.getMessage());
         }
         return "dashboard";
@@ -43,7 +40,6 @@ public class FrontendController {
     @PostMapping("/upload")
     public String uploadFile(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
         try {
-            // Delegate upload to the gateway
             String responseMessage = gatewayService.uploadCsvFile(file);
             redirectAttributes.addFlashAttribute("message", responseMessage);
         } catch (Exception e) {
