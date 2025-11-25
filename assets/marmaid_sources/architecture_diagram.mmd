@@ -1,48 +1,124 @@
 flowchart TD
-    %% Styling
-    classDef browser fill:#ffecd1,stroke:#e67e22,stroke-width:2px;
-    classDef client fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
-    classDef server fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
-    classDef db fill:#fadbd8,stroke:#c0392b,stroke-width:2px;
+    %% --- CLASS DEFINITIONS ---
+    classDef component fill:#ffffff,stroke:#333,stroke-width:1px,color:black
+    classDef db fill:#ffffff,stroke:#ef6c00,stroke-width:2px,color:black
+    classDef pattern fill:#fce4ec,stroke:#c2185b,stroke-width:1px,stroke-dasharray: 5 5,color:#880e4f
+    classDef logging fill:#ffffff,stroke:#fbc02d,stroke-width:2px,color:black
 
-    subgraph User_Workstation ["User Workstation"]
-        Browser[Browser / User Agent]:::browser
-    end
+    User((User / Browser))
 
-    subgraph Client_Microservice ["Client Service (Port 8080)"]
+    subgraph Docker_Host ["🐳 Docker Environment"]
         direction TB
-        FC[FrontendController]:::client
-        GW[EnergyGatewayService]:::client
-        View[Thymeleaf Views]:::client
-        
-        FC -->|Delegates| GW
-        FC -->|Renders| View
+
+        %% --- CLIENT MICROSERVICE (BFF) ---
+        subgraph Client_App ["🟦 Client Service : 8080"]
+            direction TB
+            
+            UI_Controller[Controller]:::component
+            Authenticator[🔐 Token Validation]:::component
+            Gateway[EnergyGatewayService]:::component
+            CB_Client[⚡ Circuit Breaker & Timeout]:::pattern
+            
+            %% Link 0
+            UI_Controller --"Delegates"--> Authenticator
+            %% Link 1
+            Authenticator --> Gateway
+            %% Link 2
+            Gateway --"Protects"--> CB_Client
+        end
+
+        %% --- SERVER MICROSERVICE (CORE) ---
+        subgraph Server_App ["🟩 Server Service : 8081"]
+            direction TB
+            
+            Auth[🔐 Token Validation]:::pattern
+            Facade[Remote Facade API]:::pattern
+            
+            subgraph Business_Logic ["Business Logic"]
+                Service[Energy Analysis Service]:::component
+                AI[AI Model Service]:::component
+                Batch[📄 Request Batch Handler]:::pattern
+            end
+            
+            CB_Database[⚡ Database Circuit Breaker]:::pattern
+            Repo[Energy Repository]:::component
+            
+            %% Link 3
+            Auth --> Facade
+            %% Link 4
+            Facade --> Service
+            
+            %% Flussi Logici
+            %% Link 5
+            Service --> AI
+            %% Link 6
+            AI --> LSTM
+            %% Link 7
+            Service --"Batch Insert"--> Batch
+            ModelFile{{AI Model .zip}}:::db
+            
+            %% Protezione verso il DB
+            %% Link 8
+            Batch --"Protects"--> CB_Database
+            %% Link 9
+            CB_Database --> Repo
+        end
+
+        %% --- DATA SERVICE ---
+        subgraph Data_Service ["🗄️ Data Service : 8082"]
+            MySQL[(MySQL)]:::db
+        end
+
+        %% --- ELK STACK ---
+        subgraph ELK_Stack ["🟧 ELK Stack : 5601"]
+            direction TB
+            Logstash[Logstash Collector]:::logging
+            Elasticsearch[(Elasticsearch DB)]:::logging
+            Kibana[Kibana UI]:::logging
+
+            %% Link 10
+            Logstash --"Indexing"--> Elasticsearch
+            %% Link 11
+            Elasticsearch --"Query Data"--> Kibana
+        end
     end
 
-    subgraph Server_Microservice ["Server Service (Port 8081)"]
-        direction TB
-        Facade[EnergyFacadeController]:::server
-        Service[EnergyAnalysisService]:::server
-        Repo[EnergyRepository]:::server
-        DTOs(Shared DTOs):::server
-        
-        Facade -->|Coarse-Grained Call| Service
-        Service -->|CRUD Ops| Repo
-        Service -.->|Maps to| DTOs
-    end
+    %% --- OPERATIONAL DATA FLOWS ---
+    %% Link 12
+    User == "1. HTTP / Session Cookie" ==> UI_Controller
+    %% Link 13
+    CB_Client == "2. REST (JSON) + JWT Token" ==> Auth
+    %% Link 14
+    Repo == "3. JPA / Hibernate" ==> MySQL
+    %% Link 15
+    LSTM -.->|"Load Weights"| ModelFile
 
-    subgraph Persistence ["Data Layer"]
-        H2[(H2 In-Memory DB)]:::db
-    end
+    %% --- LOGGING FLOWS ---
+    %% Link 16
+    Client_App -.-> |"Logs"| Logstash
+    %% Link 17
+    Server_App -.-> |"Logs"| Logstash
+    %% Link 18
+    Data_Service -.-> |"Logs"| Logstash
 
-    %% Network Connections
-    Browser ==>|HTTP GET / HTML| FC
-    GW ==>|HTTP REST / JSON| Facade
-    Repo ==>|JDBC / SQL| H2
-
-    %% Annotations
-    note_client[Pattern: BFF & Proxy]
-    note_server[Pattern: Remote Facade & Service Layer]
+    %% --- SUBGRAPH STYLES (COLORI BACKGROUND) ---
+    %% Docker Host (Grigio Neutro)
+    style Docker_Host fill:#f5f5f5,stroke:#666,stroke-width:2px
     
-    Client_Microservice -.- note_client
-    Server_Microservice -.- note_server
+    %% Client (Azzurro Chiaro)
+    style Client_App fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    
+    %% Server (Verde Chiaro)
+    style Server_App fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    
+    %% Data (Arancione Chiaro)
+    style Data_Service fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
+    
+    %% ELK (Giallo Chiaro)
+    style ELK_Stack fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    
+    %% Business Logic interna (Bianco per contrasto)
+    style Business_Logic fill:#90EE9,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
+
+    %% Applicazione stile flussi di log
+    linkStyle 16,17,18 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;

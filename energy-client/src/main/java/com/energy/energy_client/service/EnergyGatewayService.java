@@ -25,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 public class EnergyGatewayService {
 
     @Value("${app.backend.url}")
-    private String baseUrl; // Make sure it is: http://localhost:8081/api/v1
+    private String baseUrl; 
 
     private final RestClient.Builder restClientBuilder;
 
