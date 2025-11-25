@@ -14,7 +14,7 @@ public class ModelConfig {
     public static final int OUTPUTS = 1;
     
     public static final double LEARNING_RATE = 0.005; 
-    public static final int EPOCHS = 50;
+    public static final int EPOCHS = 500;
     public static final int BATCH_SIZE = 32;
     public static final int TIME_STEPS = 24;
     
