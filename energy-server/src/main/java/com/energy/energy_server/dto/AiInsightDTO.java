@@ -2,6 +2,8 @@ package com.energy.energy_server.dto;
 
 public record AiInsightDTO(
     boolean anomalyDetected,
-    double predictedLoadNextHour,
+    double expectedValue,    
+    double actualValue,      
+    double deviationPercent, 
     String optimizationSuggestion
 ) {}
