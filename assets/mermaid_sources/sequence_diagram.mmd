@@ -1,0 +1,98 @@
+sequenceDiagram
+    autonumber
+    actor User as 👤 User
+    
+    box "Client Microservice (8080)" #e1f5fe
+        participant UI as UI Controller
+        participant AuthC as 🔐 Authenticator
+        participant GW as Gateway Service
+        participant CB as ⚡ Circuit Breaker
+    end
+
+    box "Server Microservice (8081)" #e8f5e9
+        participant AuthS as 🔐 Token Validator
+        participant Facade as Remote Facade API
+        participant Service as Analysis Service
+        participant AI as 🧠 AI Model
+        participant Batch as 📄 Batch Handler
+        participant Repo as Repository
+    end
+
+    box "Data & Logging Layer" #fff9c4
+        participant MySQL as 🗄️ MySQL (8082)
+        participant Logs as 🪵 Logstash (ELK)
+    end
+
+    %% --- 1. RICHIESTA UTENTE ---
+    User->>UI: GET /dashboard
+    activate UI
+    
+    %% LOGGING ASINCRONO
+    UI--)Logs: Log "Dashboard Requested" (Async)
+    
+    %% --- 2. AUTENTICAZIONE CLIENT ---
+    UI->>AuthC: Validate Session
+    activate AuthC
+    AuthC-->>UI: Session Valid (Token JWT)
+    deactivate AuthC
+    
+    %% --- 3. CHIAMATA AL GATEWAY ---
+    UI->>GW: getSystemReport()
+    activate GW
+    
+    %% --- 4. RESILIENCE LAYER (CIRCUIT BREAKER) ---
+    GW->>CB: executeRequest()
+    activate CB
+    
+    alt Circuit is CLOSED (Normal Operation)
+        CB->>AuthS: HTTP GET /api/full-report (Bearer Token)
+        activate AuthS
+        
+        %% --- 5. VALIDAZIONE TOKEN SERVER ---
+        AuthS->>AuthS: Verify JWT Signature
+        AuthS->>Facade: Forward Request
+        deactivate AuthS
+        activate Facade
+        
+        Facade->>Service: generateReport()
+        activate Service
+        
+        %% --- 6. PARALLEL PROCESSING (Data & AI) ---
+        par Fetch Data from DB
+            Service->>Repo: findRecentReadings()
+            activate Repo
+            Repo->>MySQL: SELECT * FROM readings LIMIT 100
+            activate MySQL
+            MySQL-->>Repo: Result Set
+            deactivate MySQL
+            Repo-->>Service: List<Reading>
+            deactivate Repo
+        and AI Prediction
+            Service->>AI: predictAnomaly(lastReadings)
+            activate AI
+            Note right of AI: Load Weights from .zip<br/>Inference (CPU)
+            AI-->>Service: AiInsightDTO
+            deactivate AI
+        end
+        
+        Service-->>Facade: SystemReportDTO (Aggregated)
+        deactivate Service
+        
+        Facade--)Logs: Log "Report Generated" (Async)
+        Facade-->>CB: 200 OK (JSON)
+        deactivate Facade
+        
+        CB-->>GW: SystemReportDTO
+    else Circuit is OPEN (Failure Mode)
+        CB-->>GW: Fallback Response (Empty/Cache)
+        GW--)Logs: Log "Circuit Breaker Fallback"
+    end
+    
+    deactivate CB
+    GW-->>UI: SystemReportDTO
+    deactivate GW
+    
+    %% --- 7. RENDERING ---
+    UI->>UI: Render Thymeleaf HTML
+    UI-->>User: 200 OK (Dashboard HTML)
+    deactivate UI
