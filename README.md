@@ -1,131 +1,117 @@
 # ⚡ Distributed Energy Consumption Monitor
 
-A distributed software system designed to monitor, analyze, and predict building energy consumption.  
-This project implements a **Multi-Tier Architecture** separating the Presentation Layer from the Business Logic/Data Layer, demonstrating key distributed systems patterns like **Remote Facade**, **BFF (Backend for Frontend)**, and **DTOs**.
+A distributed software system designed to monitor, analyze, and predict building energy consumption using AI.  
+This project implements a **Multi-Tier Architecture** separating the Presentation Layer (React SPA) from the Business Logic/Data Layer (Spring Boot), demonstrating key distributed systems patterns like **Remote Facade**, **BFF (Backend for Frontend)**, and **DTOs**.
 
 ---
 
 ## 🏛️ System Architecture
 
-The system is composed of two distinct Spring Boot microservices communicating via HTTP REST.
+The system is orchestrated via **Docker Compose** and consists of two main microservices and a persistent data layer.
 
 ![Architecture Diagram](assets/architecture_diagram.png)
 
-### 1. Energy Server (Backend - Port 8081)
-* **Role:** Business Logic & Data Persistence.
-* **Pattern:** Exposes a **Coarse-Grained Remote Facade** to minimize network chattiness.
-* **Responsibility:**
-    * Manages the H2 Database via Spring Data JPA.
-    * Performs ETL operations (CSV Batch Ingestion).
-    * Aggregates data into complex DTOs (`SystemReportDTO`).
-    * Simulates AI analysis and anomaly detection.
+### 1. Client Service (Frontend - Port 5173 / 80)
+- **Technology:** React (TypeScript) + Vite + Nginx  
+- **Role:** Presentation Layer (Single Page Application).  
+- **Responsibility:**
+    - Provides a responsive dashboard for real-time monitoring.
+    - Communicates with the backend via REST API.
+    - Visualizes complex data (Charts, Data Tables, AI Insights).
+    - Handles user interactions (CSV Upload, Data Filtering).
 
-### 2. Energy Client (Frontend - Port 8080)
-* **Role:** Presentation Layer (BFF).
-* **Pattern:** **Backend-for-Frontend** & **Proxy**.
-* **Responsibility:**
-    * Stateless service rendering HTML via **Thymeleaf**.
-    * Consumes Backend APIs using `Spring RestClient`.
-    * Handles user interaction and data visualization.
-    * **No Client-Side Logic:** Pure Server-Side Rendering (SSR) without JavaScript.
+### 2. Server Service (Backend - Port 8081)
+- **Technology:** Java 21 + Spring Boot 3  
+- **Role:** Business Logic, AI Engine & Data Persistence.  
+- **Pattern:** Exposes a **Coarse-Grained Remote Facade** to minimize network chattiness.  
+- **Responsibility:**
+    - Manages the MySQL Database via Spring Data JPA.
+    - **AI Engine:** Loads a pre-trained LSTM Neural Network (Deeplearning4j) for anomaly detection.
+    - **Digital Twin Logic:** Compares real-time data vs AI predictions to flag anomalies.
+    - Processes batch CSV ingestion transactions.
 
----
-
-## 🔄 Request Workflow (Sequence Diagram)
-
-When a user requests the dashboard, the Client acts as a proxy, fetching aggregated data from the Server transparently.
-
-![Sequence Diagram](assets/sequence_diagram.png)
+### 3. Data Layer
+- **MySQL 8.0:** Persistent storage for historical energy readings.
+- **File System:** Stores the trained AI model (`trained_model.zip`) and normalizers.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Language:** Java 21 (LTS)
-* **Framework:** Spring Boot 3.3.x
-* **Build Tool:** Maven
-* **Database:** H2 Database (In-Memory)
-* **Frontend Engine:** Thymeleaf (Server-Side Rendering)
-* **Communication:** REST over HTTP
-* **Utilities:** Lombok, Spring DevTools
+| Component      | Technology                     |
+| :------------- | :----------------------------- |
+| **Frontend**   | React, TypeScript, Vite, CSS Grid |
+| **Backend**    | Java 21, Spring Boot 3 (Web, JPA) |
+| **AI / ML**    | Deeplearning4j (DL4J), ND4J (Native) |
+| **Database**   | MySQL 8.0 (Dockerized)         |
+| **DevOps**     | Docker, Docker Compose         |
+| **Patterns**   | Remote Facade, DTO, Repository, Singleton |
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-* Java JDK 21+
-* Maven 3.8+
+- Docker & Docker Compose (Required)
+- Java 21 (Optional, for local dev)
+- Node.js 18+ (Optional, for local dev)
 
-### 1. Start the Server (Backend)
+### 1. Build & Run (Docker Method - Recommended)
 
-The backend must be started first to accept connections.
+This command builds the React frontend, compiles the Java backend, and starts the MySQL database.
+
+```bash
+docker-compose up --build
+```
+
+- **Frontend:** Accessible at `http://localhost:5173` (or port 80 based on config)  
+- **Backend:** Accessible at `http://localhost:8081/api`
+
+---
+
+### 2. Manual Training 
+
+The system comes with a pre-trained model. If you want to retrain the AI model from scratch:
 
 ```bash
 cd energy-server
-mvn clean spring-boot:run
+# Ensure Energy_consumption.csv is in the dataset folder
+mvn compile exec:java -Dexec.mainClass="com.energy.energy_server.ai.Train"
 ```
 
-The server will start on port 8081.
-
-### 2. Start the Client (Frontend)
-
-Open a new terminal window.
-
-```bash
-cd energy-client
-mvn clean spring-boot:run
-```
-
-The client will start on port 8080.
-
-### 3. Access the Dashboard
-
-Open your browser and navigate to: 👉 [http://localhost:8080](http://localhost:8080)
+This generates new `trained_model.zip` and `normalizer.bin` files in the `data/` directory.
 
 ---
 
 ## 📊 Features & Usage
 
-### CSV Batch Ingestion:
-1. On the dashboard header, click "Import CSV".
-2. Select the provided `Energy_consumption.csv` file from the root directory.
-3. The system will parse and load thousands of records in seconds.
+### 1. CSV Batch Ingestion (ETL)
+- Click "📂 Upload CSV" on the top right.
+- Select the provided `Energy_consumption.csv`.
+- The system parses thousands of records and performs a Batch Insert into MySQL.
 
-### Dashboard Monitoring:
-* View real-time statistics (Average Temp, Total Consumption, Peak Load).
-* View AI-simulated insights and anomaly detection.
+### 2. AI Digital Twin (Anomaly Detection)
+- The dashboard features a dedicated "AI Digital Twin Analysis" panel.
+- **Logic:** The AI (LSTM) looks at the past 24 hours of data and predicts what the current consumption should be.
+- **Anomaly Flag:** If the actual value deviates by more than 20% from the AI prediction, the system flags it as an **ANOMALY** (Red Indicator). Otherwise, it's **NORMAL** (Green Indicator).
 
-### CRUD Operations:
-* **Create:** Manually add a new sensor reading.
-* **Edit:** Modify existing records via the UI.
-* **Delete:** Remove records from the database.
+### 3. Weekly Analysis
+- Aggregated view showing average consumption trends grouped by day of the week (Monday - Sunday).
 
-### Weekly Analysis:
-* Visualize aggregated average consumption grouped by day of the week (New Endpoint).
-
----
-
-## 🔌 API Reference (Server Internal API)
-
-The Client consumes the following Coarse-Grained APIs exposed by the Server:
-
-| Method | Endpoint                        | Description                                | Pattern          |
-|--------|----------------------------------|--------------------------------------------|------------------|
-| GET    | `/api/facade/full-report`    | Returns the complete system state (Stats + List + AI) | Remote Facade   |
-| POST   | `/api/facade/ingest-dataset` | Uploads and processes the CSV batch file  | Batch Processing |
-| GET    | `/api/facade/stats/weekly`   | Returns aggregated consumption by day of week | Aggregation      |
+### 4. Live Data Log
+- Real-time table showing the latest 100 records with visual status indicators for HVAC and Lighting systems.
 
 ---
 
-## 🗄️ Database Access
+## 🔌 API Reference (Remote Facade)
 
-You can inspect the raw data directly on the Backend H2 Console.
+The Backend exposes a Coarse-Grained API to optimize frontend performance:
 
-* **URL:** [http://127.0.0.1:8081/h2-console](http://127.0.0.1:8081/h2-console)
-* **JDBC URL:** `jdbc:h2:mem:energydb`
-* **User:** `sa`
-* **Password:** `password`
+| Method | Endpoint              | Description                                      | Pattern          |
+| :----- | :-------------------- | :----------------------------------------------- | :--------------- |
+| GET    | `/api/full-report`    | Returns aggregated stats, recent logs, and AI insights in a single call. | Remote Facade    |
+| POST   | `/api/ingest-dataset` | Handles multipart file upload for batch processing. | Batch Processing |
+| GET    | `/api/stats/weekly`   | Returns pre-calculated weekly averages.          | Aggregation      |
 
 ---
 
