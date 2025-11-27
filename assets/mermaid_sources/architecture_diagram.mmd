@@ -13,10 +13,10 @@ flowchart TD
         direction TB
 
         %% --- FRONTEND ENVIRONMENT ---
-        subgraph Browser_Env ["💻 Browser (Client-Side)"]
+        subgraph Browser_Env ["🟦 Client Service : 5173"]
             direction TB
             User((User))
-            ReactApp("⚛️ React & TypeScript"):::frontend
+            ReactApp("⚛️ React SPA<br/>(TS Logic)"):::frontend
             User ==> ReactApp
         end
 

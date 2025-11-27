@@ -70,4 +70,14 @@ public class EnergyFacadeController {
     public ResponseEntity<List<WeeklyStatsDTO>> getWeeklyStats() {
         return ResponseEntity.ok(analysisService.getWeeklyStats());
     }
+
+    /**
+     * Health check endpoint to verify server responsiveness.
+     *
+     * @return ResponseEntity with "PONG" message
+     */
+    @GetMapping("/ping")
+    public ResponseEntity<String> ping() {
+        return ResponseEntity.ok("PONG");
+    }
 }
