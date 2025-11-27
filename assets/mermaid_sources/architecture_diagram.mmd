@@ -8,70 +8,61 @@ flowchart TD
     classDef queue fill:#ffffff,stroke:#7b1fa2,stroke-width:2px,color:black
     classDef container fill:#f5f5f5,stroke:#666,stroke-width:2px
 
-    %% --- FRONTEND ENVIRONMENT ---
-    subgraph Browser_Env ["💻 Browser"]
-        direction TB
-        User((User))
-        ReactApp("⚛️ React + TypeScript<br/>"):::frontend
-        User ==> ReactApp
-    end
-
     %% --- BACKEND ENVIRONMENT ---
     subgraph Docker_Host ["🐳 Docker Environment"]
         direction TB
 
-        %% 1. CLIENT SERVICE (Top Layer)
-        subgraph Client_App ["🟦 Client Service : 8080"]
+        %% --- FRONTEND ENVIRONMENT ---
+        subgraph Browser_Env ["💻 Browser (Client-Side)"]
             direction TB
-            UI_Controller[API Controller]:::component
-            Authenticator[🔐 Token Validation]:::component
-            Gateway[EnergyGatewayService]:::component
-            CB_Client[⚡ Circuit Breaker]:::pattern
-
-            UI_Controller --> Authenticator
-            Authenticator --> Gateway
-            Gateway --"Protects"--> CB_Client
+            User((User))
+            ReactApp("⚛️ React SPA<br/>(JS Logic)"):::frontend
+            User ==> ReactApp
         end
 
-        %% 2. SERVER SERVICE (Middle Layer)
+        %% --- SERVER MICROSERVICE (CORE) ---
         subgraph Server_App ["🟩 Server Service : 8081"]
             direction TB
-            Auth[🔐 Token Validation]:::pattern
+            
+            %% Entry Points
+            Auth[🔐 Token Validation]:::component
             Facade[Remote Facade API]:::pattern
             
+            %% Business Logic Layer
             subgraph Business_Logic ["Business Logic"]
-                direction TB
                 Service[Energy Analysis Service]:::component
                 AI[AI Model Service]:::component
                 Batch[📄 Request Batch Handler]:::pattern
             end
             
+            %% Data Access Layer
             CB_Database[⚡ Database Circuit Breaker]:::pattern
             Repo[Energy Repository]:::component
             ModelFile{{AI Model .zip}}:::db
-
+            
+            %% Connections
             Auth --> Facade
             Facade --> Service
+            
             Service --> AI
             Service --"Batch Insert"--> Batch
             
-            %% Flow AI Interno
             AI --> LSTM[LSTM Network]:::component
             LSTM -.->|"Load"| ModelFile
-
-            %% Accesso Dati
+            
+            %% Protection & Persistence Flows
             Batch --"Protects"--> CB_Database
+            %%Service --"Protects"--> CB_Database
             CB_Database --> Repo
         end
 
-        %% 3. INFRASTRUCTURE SERVICES (Bottom Layer)
-        %% Li definiamo qui sotto per forzare il layout in basso
+        %% --- INFRASTRUCTURE SERVICES ---
         
         subgraph Messaging_Service ["📨 Msg Service : 5672"]
             RabbitMQ[RabbitMQ Queue]:::queue
         end
 
-        subgraph Data_Service ["🗄️ Data Service : 8082"]
+        subgraph Data_Service ["🗄️ Data Service : 3306"]
             MySQL[(MySQL)]:::db
         end
 
@@ -85,28 +76,20 @@ flowchart TD
         end
     end
 
-    %% --- CROSS-BOUNDARY CONNECTIONS ---
+    %% --- DIRECT CONNECTIONS (No BFF) ---
     
-    %% Browser -> Client
-    ReactApp == "1. HTTP REST" ==> UI_Controller
+    %% Browser -> Server Core (Direct Call)
+    ReactApp == "1. HTTP REST / JSON" ==> Auth
     
-    %% Client -> Server
-    CB_Client == "2. REST JSON" ==> Auth
-    
-    %% Server -> Data
-    Repo == "3. JPA / JDBC" ==> MySQL
-    
-    %% Server -> Messaging (Async)
-    AI -.->|"Publish Anomaly"| RabbitMQ
+    %% Server -> Infrastructure
+    Repo == "2. JPA / JDBC" ==> MySQL
+    AI -.->|"Publish Event"| RabbitMQ
 
-    %% Logging Flows (Tratteggiati per chiarezza)
-    Client_App -.-> |"Logs"| Logstash
+    %% Logging Flows
     Server_App -.-> |"Logs"| Logstash
 
-    %% --- LAYOUT OPTIMIZATION (Invisible Links) ---
-    %% Questi link invisibili forzano l'ordine verticale dei container
-    Browser_Env ~~~ Client_App
-    Client_App ~~~ Server_App
+    %% --- LAYOUT OPTIMIZATION ---
+    Browser_Env ~~~ Server_App
     Server_App ~~~ Data_Service
     Server_App ~~~ Messaging_Service
     Server_App ~~~ ELK_Stack
@@ -114,11 +97,10 @@ flowchart TD
     %% --- STYLES ---
     style Browser_Env fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,stroke-dasharray: 5 5
     style Docker_Host fill:#f5f5f5,stroke:#666,stroke-width:2px
-    style Client_App fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
     style Server_App fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     style Data_Service fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
     style Messaging_Service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     style ELK_Stack fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
-    style Business_Logic fill:#fffff,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
+    style Business_Logic fill:#ffffff,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
 
-    linkStyle 13,14 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;
+    linkStyle 11 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;

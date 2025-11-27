@@ -23,12 +23,10 @@ services:
     build: ./energy-client
     container_name: energy-client
     ports:
-      - "8080:8080" # Map host 8080 to container 8080
-    environment:
-      - APP_BACKEND_URL=http://energy-server:8081/api/
+      - "5173:80"
     depends_on:
       energy-server:
-        condition: service_healthy # Wait until server is up
+        condition: service_healthy
     networks:
       - energy-net
 
