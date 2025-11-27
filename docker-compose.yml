@@ -1,46 +1,48 @@
 version: '3.8'
 
 services:
-  # --- 1. MYSQL DATABASE ---
+  # --- DATABASE ---
   energy-db:
     image: mysql:8.0
     container_name: energy-db
     restart: always
     environment:
-      MYSQL_DATABASE: energy_db
-      MYSQL_ROOT_PASSWORD: rootpassword
+      # Docker legge dal .env e passa le variabili al container MySQL
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - "3307:3306" # Esposto su 3307 per il tuo Mac (così non tocca un eventuale MySQL locale su 3306)
+      - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql # Volume persistente: i dati restano anche se spegni!
+      - mysql_data:/var/lib/mysql
     networks:
       - energy-net
-    # HEALTHCHECK: Fondamentale. MySQL è lento a partire. Il server aspetterà questo segnale.
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
-  # --- 2. SERVER (Spring Boot) ---
+  # --- SERVER ---
   energy-server:
     build: ./energy-server
     container_name: energy-server
     ports:
       - "8081:8081"
     environment:
-      # SOVRASCRITTURA: Dentro Docker usiamo il nome del container 'energy-db' invece di 'localhost'
-      - SPRING_DATASOURCE_URL=jdbc:mysql://energy-db:3306/energy_db?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - SERVER_PORT=8081
+      - DB_URL=jdbc:mysql://energy-db:3306/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true
     volumes:
       - ./energy-server/data:/app/data
     networks:
       - energy-net
     depends_on:
       energy-db:
-        condition: service_healthy # Blocca l'avvio finché il DB non è pronto
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8081/api/ping || exit 1"]
       interval: 10s
@@ -48,7 +50,7 @@ services:
       retries: 5
       start_period: 15s
 
-  # --- 3. CLIENT (React) ---
+  # --- CLIENT ---
   energy-client:
     build: ./energy-client
     container_name: energy-client
@@ -63,7 +65,7 @@ services:
       - energy-net
 
 volumes:
-  mysql_data: # Volume gestito da Docker
+  mysql_data:
 
 networks:
   energy-net:
