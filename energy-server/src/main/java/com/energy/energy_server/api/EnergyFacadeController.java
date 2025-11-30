@@ -1,5 +1,6 @@
 package com.energy.energy_server.api;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -39,7 +40,7 @@ public class EnergyFacadeController {
         try {
             analysisService.ingestCsvData(file);
             return ResponseEntity.status(HttpStatus.CREATED).body("Dataset received. Simulation started automatically.");
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Error during ingestion: ", e);
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }

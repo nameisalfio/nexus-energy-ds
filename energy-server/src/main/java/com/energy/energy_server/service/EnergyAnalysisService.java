@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +45,9 @@ public class EnergyAnalysisService {
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
+    private static final int REQUIRED_HISTORY_SIZE = 24;
+    private static final double ANOMALY_THRESHOLD_PERCENT = 20.0;
+
     @jakarta.annotation.PostConstruct
     public void init() {
         log.info("Cleaning Database on Startup...");
@@ -53,7 +57,7 @@ public class EnergyAnalysisService {
 
     @Transactional
     public void ingestCsvData(MultipartFile file) throws IOException {
-        log.info("Receiving CSV. Parsing into RAM Queue (Database NOT touched yet)...");
+        log.info("Receiving CSV. Parsing into RAM Queue...");
         
         List<EnergyReading> buffer = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -66,7 +70,6 @@ public class EnergyAnalysisService {
                 
                 String[] data = line.split(",");
                 EnergyReading entity = new EnergyReading();
-                
                 entity.setTimestamp(LocalDateTime.parse(data[0], formatter)); 
                 entity.setTemperature(Double.valueOf(data[1]));
                 entity.setHumidity(Double.valueOf(data[2]));
@@ -78,79 +81,98 @@ public class EnergyAnalysisService {
                 entity.setDayOfWeek(data[8]);
                 entity.setHoliday(data[9]);
                 entity.setEnergyConsumption(Double.valueOf(data[10]));
-                
                 buffer.add(entity);
             }
         }
         
         ingestionQueue.addAll(buffer);
-        log.info("Loaded {} records into RAM Queue. Waiting for START command.", buffer.size());
+        log.info("Loaded {} records into RAM. Ready to start.", buffer.size());
     }
 
     @Async("taskExecutor") 
     public void startSimulation() {
-        if (isRunning.get()) {
-            log.warn("Simulation already running!");
-            return;
-        }
+        if (isRunning.get()) return;
         isRunning.set(true);
-        log.info("🚀 Simulation Started manually.");
 
-        while (!ingestionQueue.isEmpty() && isRunning.get()) {
-            try {
-                TimeUnit.MILLISECONDS.sleep(1000);
-                EnergyReading entity = ingestionQueue.poll();
-                if (entity == null) break;
+        CompletableFuture.runAsync(() -> {
+            log.info("Simulation Started");
+            int processedCount = 0;
 
-                entity.setTimestamp(LocalDateTime.now());
-                repository.save(entity);
+            while (!ingestionQueue.isEmpty() && isRunning.get()) {
+                try {
+                    if (processedCount >= REQUIRED_HISTORY_SIZE) {
+                        TimeUnit.MILLISECONDS.sleep(1000);
+                    } else {
+                        TimeUnit.MILLISECONDS.sleep(50);
+                    }
 
-                // Calcola Report e Invia
-                SystemReportDTO liveReport = generateFullReport();
-                broadcast(liveReport);
+                    EnergyReading entity = ingestionQueue.poll();
+                    if (entity == null) break;
 
-            } catch (Exception e) {
-                log.error("Simulation step failed", e);
+                    entity.setTimestamp(LocalDateTime.now());
+                    repository.save(entity);
+
+                    SystemReportDTO liveReport = generateReportFromEntity(entity);
+                    broadcast(liveReport);
+                    
+                    processedCount++;
+
+                } catch (Exception e) {
+                    log.error("Simulation step failed", e);
+                }
             }
-        }
-        isRunning.set(false);
-        log.info("🏁 Simulation Stopped (Queue empty or User stop)");
+            isRunning.set(false);
+            log.info("Simulation Stopped");
+        });
     }
 
     public void stopSimulation() {
-        log.info("🛑 Simulation Stopping...");
+        log.info("Simulation Stopping...");
         isRunning.set(false);
     }
 
     @Transactional(readOnly = true)
     public SystemReportDTO generateFullReport() {
-        List<EnergyReading> recentData = repository.findTop100ByOrderByTimestampDesc();
-        long count = repository.count();
-
-        if (recentData.isEmpty()) {
+        List<EnergyReading> recent = repository.findTop100ByOrderByTimestampDesc();
+        if (recent.isEmpty()) {
             return buildEmptyReport();
         }
+        return generateReportFromEntity(recent.get(0));
+    }
+
+    private SystemReportDTO generateReportFromEntity(EnergyReading current) {
+        long count = repository.count();
+        List<EnergyReading> all = repository.findAll(); 
         
-        EnergyReading current = recentData.get(0);
-        List<EnergyReading> allData = repository.findAll();
-        Double avgTemp = allData.stream().mapToDouble(e -> e.getTemperature() != null ? e.getTemperature() : 0.0).average().orElse(0.0);
-        Double totalEnergy = allData.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).sum();
-        Double peakLoad = allData.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).max().orElse(0.0);
-        
+        Double avgTemp = all.stream().mapToDouble(e -> e.getTemperature() != null ? e.getTemperature() : 0.0).average().orElse(0.0);
+        Double totalEnergy = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).sum();
+        Double peakLoad = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).max().orElse(0.0);
+
         GlobalStatsDTO stats = new GlobalStatsDTO(avgTemp, totalEnergy, peakLoad, count);
 
-        // AI
-        double predicted = aiService.predictNextHour(recentData);
+        double predicted = 0.0;
         double actual = current.getEnergyConsumption() != null ? current.getEnergyConsumption() : 0.0;
-        double deviation = (actual > 0) ? Math.abs(predicted - actual) / actual * 100.0 : 0.0;
-        boolean anomaly = deviation > 20.0;
+        double deviation = 0.0;
+        boolean anomaly = false;
+        String message;
 
-        AiInsightDTO ai = new AiInsightDTO(
-            anomaly, predicted, actual, deviation,
-            anomaly ? "⚠️ Anomaly Detected!" : "✅ System Normal."
-        );
+        if (count <= REQUIRED_HISTORY_SIZE) {
+            message = String.format("System Initializing (Buffer: %d/%d)...", count, REQUIRED_HISTORY_SIZE);
+        } else {
+            List<EnergyReading> history = repository.findTop100ByOrderByTimestampDesc();
+            predicted = aiService.predictNextHour(history);
+            
+            deviation = (actual > 0) ? Math.abs(predicted - actual) / actual * 100.0 : 0.0;
+            anomaly = deviation > ANOMALY_THRESHOLD_PERCENT;
+            
+            message = anomaly 
+                ? (actual > predicted ? "High consumption anomaly detected!" : "Low consumption anomaly detected.") 
+                : "System running within parameters.";
+        }
 
+        AiInsightDTO ai = new AiInsightDTO(anomaly, predicted, actual, deviation, message);
         ReadingDTO currentDto = mapToDTO(current);
+
         return new SystemReportDTO(stats, Collections.singletonList(currentDto), ai);
     }
 
@@ -159,8 +181,7 @@ public class EnergyAnalysisService {
     
     private ReadingDTO mapToDTO(EnergyReading e) {
         return new ReadingDTO(
-            e.getId(),
-            e.getTimestamp(),
+            e.getId(), e.getTimestamp(),
             e.getTemperature() != null ? e.getTemperature() : 0.0,
             e.getHumidity() != null ? e.getHumidity() : 0.0,
             e.getSquareFootage() != null ? e.getSquareFootage() : 0.0,
@@ -174,7 +195,9 @@ public class EnergyAnalysisService {
         );
     }
 
-    private SystemReportDTO buildEmptyReport() { return new SystemReportDTO(new GlobalStatsDTO(0,0,0,0), Collections.emptyList(), new AiInsightDTO(false,0,0,0,"Waiting for data...")); }
+    private SystemReportDTO buildEmptyReport() { 
+        return new SystemReportDTO(new GlobalStatsDTO(0,0,0,0), Collections.emptyList(), new AiInsightDTO(false,0,0,0,"Waiting for data...")); 
+    }
     
     public SseEmitter subscribe() { 
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
@@ -188,7 +211,7 @@ public class EnergyAnalysisService {
     private void broadcast(SystemReportDTO payload) {
         for (SseEmitter emitter : emitters) {
             try { emitter.send(SseEmitter.event().name("update").data(payload)); } 
-            catch (Exception e) { emitters.remove(emitter); }
+            catch (IOException e) { emitters.remove(emitter); }
         }
     }
 }
