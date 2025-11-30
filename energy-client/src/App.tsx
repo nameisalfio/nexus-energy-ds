@@ -57,7 +57,6 @@ function App() {
       const update: SystemReport = JSON.parse(event.data);
       const newReading = update.recentReadings[0];
       
-      // Aggiorna Tabella Live (Coda di 15)
       setLiveReadings(prev => [newReading, ...prev].slice(0, 15));
       
       setReport(prev => {
@@ -69,6 +68,11 @@ function App() {
           recentReadings: [] 
         };
       });
+
+      fetch(`${API_BASE}/stats/weekly`)
+        .then(res => res.json())
+        .then(data => setWeekly(data))
+        .catch(err => console.warn("Weekly fetch error", err));
     });
 
     eventSource.onerror = () => {
