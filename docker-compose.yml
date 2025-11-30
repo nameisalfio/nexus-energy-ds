@@ -7,7 +7,6 @@ services:
     container_name: energy-db
     restart: always
     environment:
-      # Docker legge dal .env e passa le variabili al container MySQL
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER}

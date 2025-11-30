@@ -5,12 +5,13 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping; 
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.energy.energy_server.dto.SystemReportDTO;
 import com.energy.energy_server.dto.WeeklyStatsDTO;
@@ -27,57 +28,49 @@ public class EnergyFacadeController {
 
     private final EnergyAnalysisService analysisService;
 
-    /**
-     * Endpoint to retrieve the full system report.
-     * Combines stats, readings, and AI insights into a single response.
-     *
-     * @return ResponseEntity containing SystemReportDTO
-     */
     @GetMapping("/full-report")
     public ResponseEntity<SystemReportDTO> getSystemReport() {
-        log.info("Received request for full system report.");
-        SystemReportDTO report = analysisService.generateFullReport();
-        return ResponseEntity.ok(report);
+        return ResponseEntity.ok(analysisService.generateFullReport());
     }
 
-    /**
-     * Endpoint to ingest a CSV dataset.
-     * Accepts a multipart file upload and processes the CSV data.
-     *
-     * @param file MultipartFile representing the uploaded CSV
-     * @return ResponseEntity with status message
-     */
     @PostMapping(value = "/ingest-dataset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> ingestDataset(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File is empty.");
-        }
+        if (file.isEmpty()) return ResponseEntity.badRequest().body("File is empty.");
         try {
             analysisService.ingestCsvData(file);
-            return ResponseEntity.status(HttpStatus.CREATED).body("Dataset ingestion completed successfully.");
+            return ResponseEntity.status(HttpStatus.CREATED).body("Dataset received. Simulation started automatically.");
         } catch (Exception e) {
-            log.error("Error during CSV ingestion: ", e);
-            return ResponseEntity.internalServerError().body("Error processing file: " + e.getMessage());
+            log.error("Error during ingestion: ", e);
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
     }
 
-    /**
-     * Endpoint to retrieve weekly energy consumption statistics.
-     *
-     * @return ResponseEntity containing list of WeeklyStatsDTO
-     */
     @GetMapping("/stats/weekly")
     public ResponseEntity<List<WeeklyStatsDTO>> getWeeklyStats() {
         return ResponseEntity.ok(analysisService.getWeeklyStats());
     }
 
-    /**
-     * Health check endpoint to verify server responsiveness.
-     *
-     * @return ResponseEntity with "PONG" message
-     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
+    public SseEmitter streamData() {
+        log.info("New client subscribed to SSE stream.");
+        return analysisService.subscribe();
+    }
+
+    @PostMapping("/simulation/start") 
+    public ResponseEntity<String> startSimulation() {
+        analysisService.startSimulation();
+        return ResponseEntity.ok("Simulation Started");
+    }
+
+    @PostMapping("/simulation/stop") 
+    public ResponseEntity<String> stopSimulation() {
+        analysisService.stopSimulation();
+        return ResponseEntity.ok("Simulation Stopped");
+    }
+
     @GetMapping("/ping")
     public ResponseEntity<String> ping() {
         return ResponseEntity.ok("PONG");
     }
+
 }

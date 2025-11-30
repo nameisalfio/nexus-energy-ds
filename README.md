@@ -56,7 +56,21 @@ The system is orchestrated via **Docker Compose** and consists of two main micro
 - Java 21 (Optional, for local dev)
 - Node.js 18+ (Optional, for local dev)
 
-### 1. Build & Run (Docker Method - Recommended)
+### 1. Environment Variables
+
+The system uses a `.env` file to configure environment-specific variables. Create a `.env` file in the root directory with the following structure:
+
+```env
+# MySQL Configuration
+MYSQL_ROOT_PASSWORD=
+MYSQL_DATABASE=energy_db
+MYSQL_USER=
+MYSQL_PASSWORD=
+```
+
+Ensure the `.env` file is not committed to version control by adding it to `.gitignore`.
+
+### 2. Build & Run (Docker Method - Recommended)
 
 This command builds the React frontend, compiles the Java backend, and starts the MySQL database.
 
@@ -69,7 +83,7 @@ docker-compose up --build
 
 ---
 
-### 2. Manual Training 
+### 3. Manual Training 
 
 The system comes with a pre-trained model. If you want to retrain the AI model from scratch:
 
