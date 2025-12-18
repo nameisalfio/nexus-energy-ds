@@ -51,7 +51,7 @@ public class EnergyAnalysisService {
     @jakarta.annotation.PostConstruct
     public void init() {
         log.info("Cleaning Database on Startup...");
-        repository.deleteAll();
+        repository.deleteAllInBatch(); 
         ingestionQueue.clear();
     }
 

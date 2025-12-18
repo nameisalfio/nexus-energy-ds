@@ -35,6 +35,8 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - SERVER_PORT=8081
       - DB_URL=jdbc:mysql://energy-db:3306/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION_MS=86400000
     volumes:
       - ./energy-server/data:/app/data
     networks:
@@ -43,12 +45,12 @@ services:
       energy-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8081/api/ping || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/auth/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
-
+      
   # --- CLIENT ---
   energy-client:
     build: ./energy-client
