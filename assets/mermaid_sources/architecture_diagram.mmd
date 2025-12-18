@@ -1,5 +1,81 @@
-flowchart TD
-    %% --- CLASS DEFINITIONS ---
+---
+config:
+  layout: elk
+---
+flowchart TB
+ subgraph Browser_Env["🟦 Client Service : 5173"]
+    direction TB
+        User(("User"))
+        ReactApp("⚛️ React SPA<br>(TS Logic)")
+  end
+ subgraph Business_Logic["Business Logic"]
+        Service["Energy Analysis Service"]
+        AI["AI Model Service"]
+        Batch["📄 Request Batch Handler"]
+  end
+ subgraph Server_App["🟩 Server Service : 8081"]
+    direction TB
+        Auth["🔐 Token Validation"]
+        Facade["Remote Facade API"]
+        Business_Logic
+        CB_Database["⚡ Database Circuit Breaker"]
+        Repo["Energy Repository"]
+        ModelFile{{"AI Model .zip"}}
+        LSTM["LSTM Network"]
+  end
+ subgraph Messaging_Service["📨 Msg Service : 5672"]
+        RabbitMQ["RabbitMQ Queue"]
+  end
+ subgraph Data_Service["🗄️ Data Service : 3306"]
+        MySQL[("MySQL")]
+  end
+ subgraph ELK_Stack["🟧 ELK Stack : 5601"]
+    direction TB
+        Logstash["Logstash"]
+        Elasticsearch["Elasticsearch"]
+        Kibana["Kibana"]
+  end
+ subgraph Docker_Host["🐳 Docker Environment"]
+    direction TB
+        Browser_Env
+        Server_App
+        Messaging_Service
+        Data_Service
+        ELK_Stack
+  end
+    User --> ReactApp
+    Auth --> Facade
+    Facade --> Service
+    Service --> AI
+    Service -- Batch Insert --> Batch
+    AI --> LSTM
+    LSTM -. Load .-> ModelFile
+    Batch -- Protects --> CB_Database
+    CB_Database --> Repo
+    Logstash --> Elasticsearch
+    Elasticsearch --> Kibana
+    ReactApp -- "1. HTTP REST / JSON" --> Auth
+    Repo -- "2. JPA / JDBC" --> MySQL
+    AI -. Publish Event .-> RabbitMQ
+    Server_App -. Logs .-> Logstash
+    Browser_Env ~~~ Server_App
+    Server_App ~~~ Data_Service & Messaging_Service & ELK_Stack
+
+     ReactApp:::frontend
+     Auth:::component
+     Facade:::pattern
+     Service:::component
+     AI:::component
+     Batch:::pattern
+     CB_Database:::pattern
+     Repo:::component
+     ModelFile:::db
+     LSTM:::component
+     RabbitMQ:::queue
+     MySQL:::db
+     Logstash:::logging
+     Elasticsearch:::logging
+     Kibana:::logging
     classDef component fill:#ffffff,stroke:#333,stroke-width:1px,color:black
     classDef db fill:#ffffff,stroke:#ef6c00,stroke-width:2px,color:black
     classDef pattern fill:#fce4ec,stroke:#c2185b,stroke-width:1px,stroke-dasharray: 5 5,color:#880e4f
@@ -7,100 +83,11 @@ flowchart TD
     classDef frontend fill:#61dafb,stroke:#20232a,stroke-width:2px,color:black
     classDef queue fill:#ffffff,stroke:#7b1fa2,stroke-width:2px,color:black
     classDef container fill:#f5f5f5,stroke:#666,stroke-width:2px
-
-    %% --- BACKEND ENVIRONMENT ---
-    subgraph Docker_Host ["🐳 Docker Environment"]
-        direction TB
-
-        %% --- FRONTEND ENVIRONMENT ---
-        subgraph Browser_Env ["🟦 Client Service : 5173"]
-            direction TB
-            User((User))
-            ReactApp("⚛️ React SPA<br/>(TS Logic)"):::frontend
-            User ==> ReactApp
-        end
-
-        %% --- SERVER MICROSERVICE (CORE) ---
-        subgraph Server_App ["🟩 Server Service : 8081"]
-            direction TB
-            
-            %% Entry Points
-            Auth[🔐 Token Validation]:::component
-            Facade[Remote Facade API]:::pattern
-            
-            %% Business Logic Layer
-            subgraph Business_Logic ["Business Logic"]
-                Service[Energy Analysis Service]:::component
-                AI[AI Model Service]:::component
-                Batch[📄 Request Batch Handler]:::pattern
-            end
-            
-            %% Data Access Layer
-            CB_Database[⚡ Database Circuit Breaker]:::pattern
-            Repo[Energy Repository]:::component
-            ModelFile{{AI Model .zip}}:::db
-            
-            %% Connections
-            Auth --> Facade
-            Facade --> Service
-            
-            Service --> AI
-            Service --"Batch Insert"--> Batch
-            
-            AI --> LSTM[LSTM Network]:::component
-            LSTM -.->|"Load"| ModelFile
-            
-            %% Protection & Persistence Flows
-            Batch --"Protects"--> CB_Database
-            %%Service --"Protects"--> CB_Database
-            CB_Database --> Repo
-        end
-
-        %% --- INFRASTRUCTURE SERVICES ---
-        
-        subgraph Messaging_Service ["📨 Msg Service : 5672"]
-            RabbitMQ[RabbitMQ Queue]:::queue
-        end
-
-        subgraph Data_Service ["🗄️ Data Service : 3306"]
-            MySQL[(MySQL)]:::db
-        end
-
-        subgraph ELK_Stack ["🟧 ELK Stack : 5601"]
-            direction TB
-            Logstash[Logstash]:::logging
-            Elasticsearch[Elasticsearch]:::logging
-            Kibana[Kibana]:::logging
-            
-            Logstash --> Elasticsearch --> Kibana
-        end
-    end
-
-    %% --- DIRECT CONNECTIONS (No BFF) ---
-    
-    %% Browser -> Server Core (Direct Call)
-    ReactApp == "1. HTTP REST / JSON" ==> Auth
-    
-    %% Server -> Infrastructure
-    Repo == "2. JPA / JDBC" ==> MySQL
-    AI -.->|"Publish Event"| RabbitMQ
-
-    %% Logging Flows
-    Server_App -.-> |"Logs"| Logstash
-
-    %% --- LAYOUT OPTIMIZATION ---
-    Browser_Env ~~~ Server_App
-    Server_App ~~~ Data_Service
-    Server_App ~~~ Messaging_Service
-    Server_App ~~~ ELK_Stack
-
-    %% --- STYLES ---
-    style Browser_Env fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,stroke-dasharray: 5 5
-    style Docker_Host fill:#f5f5f5,stroke:#666,stroke-width:2px
     style Server_App fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Browser_Env fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,stroke-dasharray: 5 5
     style Data_Service fill:#ffe0b2,stroke:#ef6c00,stroke-width:2px
     style Messaging_Service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     style ELK_Stack fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    style Docker_Host fill:#f5f5f5,stroke:#666,stroke-width:2px
     style Business_Logic fill:#ffffff,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
-
-    linkStyle 11 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3;
+    linkStyle 11 stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 3 3,fill:none

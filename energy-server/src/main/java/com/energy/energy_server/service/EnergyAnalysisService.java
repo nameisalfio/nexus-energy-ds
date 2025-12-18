@@ -96,14 +96,14 @@ public class EnergyAnalysisService {
 
         CompletableFuture.runAsync(() -> {
             log.info("Simulation Started");
-            int processedCount = 0;
-
             while (!ingestionQueue.isEmpty() && isRunning.get()) {
                 try {
-                    if (processedCount >= REQUIRED_HISTORY_SIZE) {
-                        TimeUnit.MILLISECONDS.sleep(1000);
+                    long currentDbCount = repository.count();
+
+                    if (currentDbCount >= REQUIRED_HISTORY_SIZE) {
+                        TimeUnit.MILLISECONDS.sleep(1000); 
                     } else {
-                        TimeUnit.MILLISECONDS.sleep(50);
+                        TimeUnit.MILLISECONDS.sleep(50);   
                     }
 
                     EnergyReading entity = ingestionQueue.poll();
@@ -111,18 +111,15 @@ public class EnergyAnalysisService {
 
                     entity.setTimestamp(LocalDateTime.now());
                     repository.save(entity);
-
                     SystemReportDTO liveReport = generateReportFromEntity(entity);
                     broadcast(liveReport);
-                    
-                    processedCount++;
-
-                } catch (Exception e) {
-                    log.error("Simulation step failed", e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.error("Simulation interrupted", e);
                 }
             }
             isRunning.set(false);
-            log.info("Simulation Stopped");
+            log.info("🏁 Simulation Stopped");
         });
     }
 

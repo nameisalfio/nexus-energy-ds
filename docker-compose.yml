@@ -54,7 +54,7 @@ services:
     build: ./energy-client
     container_name: energy-client
     ports:
-      - "5173:80"
+      - "5173:80"   
     environment:
       - APP_BACKEND_URL=http://energy-server:8081/api
     depends_on:
