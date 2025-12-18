@@ -23,7 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
-    private final TokenBlacklistService blacklistService; // Guava Service
+    private final TokenBlacklistService blacklistService; 
 
     @Override
     protected void doFilterInternal(

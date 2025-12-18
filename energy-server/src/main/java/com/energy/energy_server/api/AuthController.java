@@ -91,6 +91,7 @@ public class AuthController {
         return ResponseEntity.badRequest().body("Invalid token");
     }
 
+    // Docker Compose health check endpoint
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Server is Alive");
