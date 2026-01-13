@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # --- DATABASE ---
   energy-db:
@@ -18,11 +16,86 @@ services:
     networks:
       - energy-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  # --- RABBITMQ ---
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # Porta per l'app Java
+      - "15672:15672" # Interfaccia Web (user/pass definiti sotto)
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest} # Usa variabile o default 'guest'
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq # Persistenza code e messaggi
+    networks:
+      - energy-net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # --- ELASTICSEARCH ---
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: elasticsearch
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.ml.enabled=false            # Disabilita Machine Learning (pesante)
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    volumes:
+      - ./elk-config/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - energy-net
+
+  # --- LOGSTASH ---
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.1
+    container_name: logstash
+    volumes:
+      - ./elk-config/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./elk-config/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5000:5000"
+    environment:
+      - "LS_JAVA_OPTS=-Xms128m -Xmx128m"
+    networks:
+      - energy-net
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9600/_node/pipelines/main?pretty" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # --- KIBANA ---
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    volumes:
+      - ./elk-config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    ports:
+      - "5601:5601"
+    networks:
+      - energy-net
+    depends_on:
+      - elasticsearch
 
   # --- SERVER ---
   energy-server:
@@ -37,6 +110,7 @@ services:
       - DB_URL=jdbc:mysql://energy-db:3306/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false&autoReconnect=true
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION_MS=86400000
+      - "JAVA_OPTS=-Xms512m -Xmx512m -Dorg.bytedeco.javacpp.maxbytes=512m"
     volumes:
       - ./energy-server/data:/app/data
     networks:
@@ -44,19 +118,23 @@ services:
     depends_on:
       energy-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/auth/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/api/auth/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
-      
+
   # --- CLIENT ---
   energy-client:
     build: ./energy-client
     container_name: energy-client
     ports:
-      - "5173:80"   
+      - "5173:80"
     environment:
       - APP_BACKEND_URL=http://energy-server:8081/api
     depends_on:
@@ -65,9 +143,12 @@ services:
     networks:
       - energy-net
 
-volumes:
-  mysql_data:
-
+# Define a custom bridge network for internal communication
 networks:
   energy-net:
     driver: bridge
+
+volumes:
+  elasticsearch_data:
+  mysql_data:
+  rabbitmq_data:
