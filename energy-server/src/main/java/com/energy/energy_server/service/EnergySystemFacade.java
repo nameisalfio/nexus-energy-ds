@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +35,7 @@ public class EnergySystemFacade {
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private static final int REQUIRED_HISTORY_SIZE = 24;
 
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     public void init() {
         log.info("System Init & Cleanup");
         analyticsService.clearHistory();

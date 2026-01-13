@@ -132,3 +132,37 @@ The Backend exposes a Coarse-Grained API to optimize frontend performance:
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+
+
+
+
+
+Apri Kibana: http://localhost:5601.
+Vai su Management (icona ingranaggio) -> Stack Management.
+Clicca su Data Views -> Create data view.
+Nel campo Name, inserisci il pattern che hai definito in Logstash: energy-server-logs-*.
+Dovresti vedere che Kibana trova l'indice (es. energy-server-logs-2024.01.03).
+Nel campo Timestamp field, seleziona @timestamp.
+Salva.
+Ora vai nel menu Analytics -> Discover e vedrai i tuoi log.
+
+
+
+
+
+
+Apri Kibana -> Dashboard -> Create New.
+Grafico 1: Timeline Anomalie (Bar Chart)
+Asse X: @timestamp
+Asse Y: Count
+Filtro: event_type: "ANOMALY"
+Cosa vedi: Quante anomalie ci sono state ogni ora.
+Grafico 2: Deviazione Media (Metric)
+Metric: Average di anomaly_deviation.
+Cosa vedi: Quanto sono gravi le anomalie in media (es. "35%").
+Grafico 3: Previsto vs Reale (Line Chart - Lens)
+Asse X: @timestamp
+Asse Y (Layer 1): anomaly_actual (Colore Rosso)
+Asse Y (Layer 2): anomaly_predicted (Colore Blu)
+Cosa vedi: Un confronto visivo di quanto il modello AI si è sbagliato nei momenti critici.
