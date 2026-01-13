@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <!-- Configurazione per inviare i log a Logstash via TCP -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <!-- 'logstash' è il nome del servizio definito nel docker-compose -->
+        <!-- '5000' è la porta definita in logstash.conf input { tcp ... } -->
+        <destination>logstash:5000</destination>
+
+        <!-- Questo encoder trasforma i log in JSON -->
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+
+        <!-- Opzionale: Non bloccare l'app se Logstash è giù -->
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+
+        <!-- Gestire meglio le cadute di connessione -->
+        <reconnectionDelay>5 second</reconnectionDelay>
+        <writeBufferSize>16384</writeBufferSize>
+    </appender>
+
+    <!-- Regole di logging -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />  <!-- Continua a scrivere su console -->
+        <appender-ref ref="LOGSTASH" /> <!-- Invia anche a Logstash -->
+    </root>
+</configuration>
