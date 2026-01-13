@@ -39,7 +39,8 @@ public class AuthController {
     @Data 
     static class RegisterRequest { 
         private String username; 
-        private String password; 
+        private String password;
+        private String email;
         private String role; // "USER" or "ADMIN"
     }
 
@@ -61,6 +62,7 @@ public class AuthController {
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .email(request.getEmail())
                 .role(role) 
                 .build();
 
