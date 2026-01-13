@@ -1,0 +1,12 @@
+cluster.name: "energy-cluster"
+network.host: 0.0.0.0
+
+# Configurazione Single Node per sviluppo
+discovery.type: single-node
+
+# Disabilita sicurezza (SSL/Password) per semplicità locale
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+
+# Gestione della memoria (opzionale, ma consigliato per evitare crash)
+xpack.ml.enabled: false

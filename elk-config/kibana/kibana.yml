@@ -1,0 +1,12 @@
+server.name: kibana
+server.host: "0.0.0.0"
+elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+
+# DISABILITA IL MONITORAGGIO DEI CONTAINER (Risolve l'errore 500)
+monitoring.ui.container.elasticsearch.enabled: false
+xpack.monitoring.enabled: false
+xpack.monitoring.kibana.collection.enabled: false
+
+# Disabilita telemetria e suggerimenti (alleggerisce Kibana)
+telemetry.enabled: false
+xpack.reporting.enabled: false
