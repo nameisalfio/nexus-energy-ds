@@ -68,9 +68,9 @@ services:
       - ./elk-config/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
       - ./elk-config/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
-      - "LS_JAVA_OPTS=-Xms128m -Xmx128m"
+      - "LS_JAVA_OPTS=-Xms512m -Xmx512m"
     networks:
       - energy-net
     depends_on:
