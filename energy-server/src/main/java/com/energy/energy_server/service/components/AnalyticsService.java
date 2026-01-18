@@ -36,9 +36,9 @@ public class AnalyticsService {
         long count = energyRepository.count();
         List<EnergyReading> all = energyRepository.findAll();
 
-        Double avgTemp = all.stream().mapToDouble(e -> e.getTemperature() != null ? e.getTemperature() : 0.0).average().orElse(0.0);
-        Double totalEnergy = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).sum();
-        Double peakLoad = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).max().orElse(0.0);
+        double avgTemp = all.stream().mapToDouble(e -> e.getTemperature() != null ? e.getTemperature() : 0.0).average().orElse(0.0);
+        double totalEnergy = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).sum();
+        double peakLoad = all.stream().mapToDouble(e -> e.getEnergyConsumption() != null ? e.getEnergyConsumption() : 0.0).max().orElse(0.0);
 
         GlobalStatsDTO stats = new GlobalStatsDTO(avgTemp, totalEnergy, peakLoad, count);
 
@@ -93,7 +93,7 @@ public class AnalyticsService {
 
     public EnergyReading getLatestReading() {
         List<EnergyReading> recent = energyRepository.findTop100ByOrderByTimestampDesc();
-        return recent.isEmpty() ? null : recent.get(0);
+        return recent.isEmpty() ? null : recent.getFirst();
     }
 
     public void clearHistory() {
