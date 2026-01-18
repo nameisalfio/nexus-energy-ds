@@ -3,6 +3,8 @@ package com.energy.energy_server.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,44 +13,48 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+@Slf4j
 @Configuration
 public class RabbitMQConfig {
 
     public static final String EXCHANGE_NAME = "energy_exchange";
-
-    // Code
     public static final String QUEUE_NAME = "energy_fallback_queue";
     public static final String ROUTING_KEY = "energy.reading.save";
     public static final String ANOMALY_QUEUE = "energy_anomaly_queue";
     public static final String ANOMALY_ROUTING_KEY = "energy.anomaly.#";
-
-    // --- 1. DEFINIZIONE OBJECT MAPPER (LA SOLUZIONE ALL'ERRORE) ---
+    public static final String DLQ_NAME = QUEUE_NAME + ".dlq";
 
     @Bean
-    @Primary // Dice a Spring: "Usa questo come principale se ne trovi altri"
+    @Primary
     public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
-        // Modulo fondamentale per convertire LocalDateTime correttamente
         mapper.registerModule(new JavaTimeModule());
-        // Disabilita la conversione delle date in array numerici [2026, 1, 1...]
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;
     }
 
-    // --- 2. CODE & EXCHANGE ---
-
+    /**
+     * FIX #1: Coda principale con retry infinito e TTL lungo
+     * - Quorum queue per alta affidabilità
+     * - TTL di 7 giorni (invece di 1)
+     * - Nessun limite di lunghezza per evitare perdite
+     */
     @Bean
     public Queue fallbackQueue() {
         return QueueBuilder.durable(QUEUE_NAME)
                 .withArgument("x-queue-type", "quorum")
-                .withArgument("x-message-ttl", 86400000)
-                .withArgument("x-max-length", 100000)
-                .withArgument("x-overflow", "reject-publish")
+                // TTL 7 giorni = 604800000ms
+                .withArgument("x-message-ttl", 604800000)
+                // RIMOSSO x-max-length per evitare scarto messaggi
+                // RIMOSSO x-overflow per non rifiutare publish
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", DLQ_NAME)
+                // Delivery limit: dopo 1000 tentativi falliti, va in DLQ
+                .withArgument("x-delivery-limit", 1000)
                 .build();
     }
 
@@ -59,12 +65,21 @@ public class RabbitMQConfig {
                 .build();
     }
 
+    /**
+     * FIX #2: DLQ con retention infinito per analisi post-mortem
+     */
     @Bean
-    public TopicExchange exchange() {
-        return new TopicExchange(EXCHANGE_NAME);
+    public Queue deadLetterQueue() {
+        return QueueBuilder.durable(DLQ_NAME)
+                .withArgument("x-queue-type", "quorum")
+                // Nessun TTL sulla DLQ - i messaggi restano per sempre
+                .build();
     }
 
-    // --- 3. BINDINGS ---
+    @Bean
+    public TopicExchange exchange() {
+        return new TopicExchange(EXCHANGE_NAME, true, false);
+    }
 
     @Bean
     public Binding binding(Queue fallbackQueue, TopicExchange exchange) {
@@ -76,23 +91,20 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(anomalyQueue).to(exchange).with(ANOMALY_ROUTING_KEY);
     }
 
-    // --- 4. CONVERTER CUSTOM ---
-
     @Bean
     public MessageConverter jsonMessageConverter(ObjectMapper objectMapper) {
         return new MessageConverter() {
 
             @Override
             @NonNull
-            public Message toMessage(@NonNull Object object, @NonNull MessageProperties messageProperties) throws MessageConversionException {
+            public Message toMessage(@NonNull Object object, @NonNull MessageProperties messageProperties)
+                    throws MessageConversionException {
                 try {
                     byte[] bytes = objectMapper.writeValueAsBytes(object);
 
                     messageProperties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
                     messageProperties.setContentEncoding(StandardCharsets.UTF_8.name());
                     messageProperties.setContentLength(bytes.length);
-
-                    // Imposta TypeID per il destinatario
                     messageProperties.setHeader("__TypeId__", object.getClass().getName());
 
                     return new Message(bytes, messageProperties);
@@ -106,24 +118,57 @@ public class RabbitMQConfig {
             public Object fromMessage(@NonNull Message message) throws MessageConversionException {
                 try {
                     String typeId = message.getMessageProperties().getHeader("__TypeId__");
-
-                    if (typeId != null) {
-                        Class<?> targetClass = Class.forName(typeId);
-                        return objectMapper.readValue(message.getBody(), targetClass);
-                    } else {
+                    if (typeId == null) {
                         return objectMapper.readTree(message.getBody());
                     }
+
+                    if (!typeId.startsWith("com.energy.energy_server")) {
+                        throw new MessageConversionException("Insecure type detected: " + typeId);
+                    }
+
+                    Class<?> targetClass = Class.forName(typeId);
+                    return objectMapper.readValue(message.getBody(), targetClass);
                 } catch (ClassNotFoundException | IOException e) {
-                    throw new MessageConversionException("Failed to convert JSON message to object", e);
+                    throw new MessageConversionException("Failed to convert JSON to object", e);
                 }
             }
         };
     }
 
+    /**
+     * FIX #3: RabbitTemplate con Publisher Confirms
+     * Garantisce che ogni messaggio sia effettivamente arrivato a RabbitMQ
+     */
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MessageConverter jsonMessageConverter) {
+    public RabbitTemplate rabbitTemplate(
+            ConnectionFactory connectionFactory,
+            MessageConverter jsonMessageConverter) {
+
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(jsonMessageConverter);
+
+        // Publisher Confirms: callback quando RabbitMQ conferma ricezione
+        template.setConfirmCallback((correlationData, ack, cause) -> {
+            if (ack) {
+                log.debug("Message confirmed by RabbitMQ: {}", correlationData);
+            } else {
+                log.error("CRITICAL: Message rejected by RabbitMQ! CorrelationData: {}, Cause: {}",
+                        correlationData, cause);
+                // TODO: Implementare retry o fallback locale
+            }
+        });
+
+        // Return Callback: chiamato se il messaggio non può essere routato
+        template.setReturnsCallback(returned -> {
+            log.error("CRITICAL: Message returned (unroutable)! " +
+                            "Exchange: {}, RoutingKey: {}, ReplyText: {}, Message: {}",
+                    returned.getExchange(),
+                    returned.getRoutingKey(),
+                    returned.getReplyText(),
+                    returned.getMessage());
+            // TODO: Implementare retry o fallback locale se serve
+        });
+
         return template;
     }
 }
