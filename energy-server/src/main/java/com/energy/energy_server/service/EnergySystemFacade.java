@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
+import com.energy.energy_server.service.components.AuditService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class EnergySystemFacade {
     private final IngestionService ingestionService;
     private final SimulationService simulationService;
     private final AnalyticsService analyticsService;
+    private final AuditService auditService;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private static final int REQUIRED_HISTORY_SIZE = 24;
@@ -44,6 +46,7 @@ public class EnergySystemFacade {
     // --- 1. GESTIONE UPLOAD ---
     public void handleDatasetUpload(MultipartFile file) throws IOException {
         List<EnergyReading> data = ingestionService.parseCsv(file);
+        auditService.reset(data.size()); // Inizializzazione audit
         simulationService.loadQueue(data);
         log.info("Dataset processed and queued.");
     }
@@ -51,21 +54,39 @@ public class EnergySystemFacade {
     // --- 2. GESTIONE SIMULAZIONE ---
     @Async("taskExecutor")
     public void startSimulation() {
+
         if (simulationService.getIsRunning().get()) return;
         simulationService.getIsRunning().set(true);
 
         CompletableFuture.runAsync(() -> {
             log.info("Simulation Loop Started");
-            
+
             while (!simulationService.getIngestionQueue().isEmpty() && simulationService.getIsRunning().get()) {
                 try {
+                    // 1. Conteggio (protetto da Circuit Breaker)
                     long dbCount = simulationService.getRecordCount();
+
+                    // 2. Calcolo delay
                     TimeUnit.MILLISECONDS.sleep(dbCount >= REQUIRED_HISTORY_SIZE ? 1000 : 50);
+
+                    // 3. Prelevo dalla coda
                     EnergyReading entity = simulationService.getIngestionQueue().poll();
                     if (entity == null) break;
+
+                    // 4. Salvataggio (protetto da Circuit Breaker, salva su RabbitMQ)
                     simulationService.saveReading(entity);
-                    SystemReportDTO report = analyticsService.generateReport(entity);
-                    broadcast(report);
+
+                    // 5. Analytics
+                    try {
+                        SystemReportDTO report = analyticsService.generateReport(entity);
+                        broadcast(report);
+                    } catch (Exception e) {
+                        log.error("Analytics skipped: Database is not available for real-time analysis.", e);
+                    }
+
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
                 } catch (Exception e) {
                     log.error("Simulation Error", e);
                 }
