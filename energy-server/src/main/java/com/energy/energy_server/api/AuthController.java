@@ -34,11 +34,24 @@ public class AuthController {
     private final TokenBlacklistService blacklistService;
 
     // internal DTOs 
-    @Data static class AuthRequest { private String username; private String password; }
-    @Data static class AuthResponse { private String token; public AuthResponse(String t) { this.token = t; } }
-    @Data 
-    static class RegisterRequest { 
-        private String username; 
+    @Data
+    static class AuthRequest {
+        private String username;
+        private String password;
+    }
+
+    @Data
+    static class AuthResponse {
+        private String token;
+
+        public AuthResponse(String t) {
+            this.token = t;
+        }
+    }
+
+    @Data
+    static class RegisterRequest {
+        private String username;
         private String password;
         private String email;
         private String role; // "USER" or "ADMIN"
@@ -46,8 +59,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest().body("Username already taken");
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body("Email already taken");
         }
 
         User.Role role = User.Role.USER;
@@ -63,7 +76,7 @@ public class AuthController {
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
-                .role(role) 
+                .role(role)
                 .build();
 
         userRepository.save(user);
