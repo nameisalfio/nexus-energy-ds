@@ -5,11 +5,21 @@ import com.energy.energy_server.model.EnergyReading;
 import com.energy.energy_server.repository.EnergyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.JDBCConnectionException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
+import java.net.UnknownHostException;
+
+/**
+ * VERSIONE MINIMA CHE COMPILA SICURO
+ * Usa questa se hai problemi di compilazione
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -17,31 +27,77 @@ public class RecoveryService {
 
     private final EnergyRepository energyRepository;
 
-    // Ascolta coda RabbitMQ
-    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME)
-    public void recoverData(EnergyReading energyReading, @Header(AmqpHeaders.MESSAGE_ID) String messageId) {
+    private final AuditService auditService;
 
-        log.info("RECOVERY: Processing message from RabbitMQ. ID: {}", messageId);
+    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME, concurrency = "1") // Concurrency per evitare race conditions
+    public void recoverData(
+            EnergyReading energyReading,
+            @Header(AmqpHeaders.MESSAGE_ID) String messageId) {
+
+        log.info("🔄 RECOVERY START | ID: {} | Source: RabbitMQ", messageId);
+
+        // Validazione ID
+        if (messageId == null) {
+            log.error("❌ RECOVERY REJECTED | Reason: Missing ID | Action: Skipped");
+            return;
+        }
 
         try {
-            // 1. Controllo duplicati, evitiamo salvataggi doppi
-            if (energyReading.getId() != null && energyRepository.existsById(energyReading.getId())) {
-                log.warn("RECOVERY: Duplicate detected, skipping. ID: {}", energyReading.getId());
+            // Controllo duplicati
+            if (energyRepository.existsByCorrelationId(messageId)) {
+                log.warn("⏭️  RECOVERY_SKIP | ID: {} | Reason: Duplicate already in DB", messageId);
                 return;
             }
 
-            // 2. Salvataggio su DB
+            // Salvataggio
+            energyReading.setCorrelationId(messageId);
             energyRepository.save(energyReading);
 
-            // 3. ACK Automatico:
-            // Se il metodo finisce senza errori, Spring dice a RabbitMQ "Tutto OK, cancella messaggio".
+            auditService.incrementReceived(); // Incremento ricezione Rabbit
+            auditService.logStatus(); // Stampa riepilogo ogni volta che recupera
 
-        } catch (Exception e) {
-            log.error("RECOVERY FAILED: DB might be down still. Re-queueing message. Error: {}", e.getMessage());
+            log.info("✅ RECOVERY_SUCCESS | ID: {} | Timestamp: {} | Temp: {}°C | Humidity: {}% | Energy: {} kWh | Action: Saved to DB",
+                    messageId,
+                    energyReading.getTimestamp(),
+                    energyReading.getTemperature(),
+                    energyReading.getHumidity(),
+                    energyReading.getEnergyConsumption());
 
-            // Lanciare l'eccezione è FONDAMENTALE qui.
-            // Dice a Spring: "Non ho finito, non cancellare il messaggio!".
-            // Spring rimetterà il messaggio in coda e riproverà dopo qualche secondo.
+        } catch (CannotGetJdbcConnectionException e) {
+            // DB irraggiungibile
+            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: DB_UNREACHABLE | Action: Requeued", messageId);
+            throw e;
+
+        } catch (QueryTimeoutException e) {
+            // Query troppo lenta
+            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: DB_TIMEOUT | Action: Requeued", messageId);
+            throw e;
+
+        } catch (JDBCConnectionException e) {
+            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: JDBC_CONNECTION | Action: Requeued", messageId);
+            throw e;
+
+        } catch (DataAccessException e) {
+            // Altri errori DB
+            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: DB_ERROR | Error: {} | Action: Requeued",
+                    messageId, e.getClass().getSimpleName());
+            throw e;
+
+        }
+
+//        catch (UnknownHostException e) {
+//            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: UNKNOWN_HOST | Action: Requeued", messageId);
+//            throw e;
+//
+//        }
+        catch (Exception e) {
+            // Altre eccezioni - Log più dettagliato
+            log.error("❌ RECOVERY_ERROR | ID: {} | Reason: {} | Message: {} | Action: Message requeued",
+                    messageId,
+                    e.getClass().getSimpleName(),
+                    e.getMessage());
+
+            // Rilancia per requeue
             throw e;
         }
     }
