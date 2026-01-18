@@ -8,6 +8,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState('USER'); // Default role
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +16,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     e.preventDefault();
     setError(null);
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-    const body: any = { username, password };
+    const body: any = { username, password, email };
     
     // Se ci stiamo registrando, inviamo anche il ruolo
     if (isRegister) {
@@ -74,6 +75,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               required 
             />
           </div>
+
+          <div className="form-group">
+            <label>Email</label>
+            <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                    required
+            />
+            </div>
 
           {/* Selettore Ruolo (Solo in Registrazione) */}
           {isRegister && (
