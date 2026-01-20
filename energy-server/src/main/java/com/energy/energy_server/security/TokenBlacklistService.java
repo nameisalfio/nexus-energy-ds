@@ -21,10 +21,12 @@ public class TokenBlacklistService {
     }
 
     public void blacklistToken(String token) {
-        tokenBlacklist.put(token, true);
+        if (token != null) {
+            tokenBlacklist.put(token, true);
+        }
     }
 
     public boolean isBlacklisted(String token) {
-        return tokenBlacklist.getIfPresent(token) != null;
+        return token != null && tokenBlacklist.getIfPresent(token) != null;
     }
 }
