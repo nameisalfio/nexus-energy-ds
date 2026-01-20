@@ -67,7 +67,7 @@ public class EnergySystemFacade {
                     long dbCount = simulationService.getRecordCount();
 
                     // 2. Calcolo delay
-                    TimeUnit.MILLISECONDS.sleep(dbCount >= REQUIRED_HISTORY_SIZE ? 1000 : 50);
+                    TimeUnit.MILLISECONDS.sleep(dbCount >= REQUIRED_HISTORY_SIZE ? 500 : 50);
 
                     // 3. Prelevo dalla coda
                     EnergyReading entity = simulationService.getIngestionQueue().poll();
