@@ -13,7 +13,6 @@ import com.energy.energy_server.config.RabbitMQConfig;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -161,7 +160,7 @@ public class SimulationService {
     }
 
     private String getUserForAlert() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
             return auth.getName();
         }

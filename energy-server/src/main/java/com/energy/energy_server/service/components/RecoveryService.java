@@ -29,7 +29,7 @@ public class RecoveryService {
 
     private final AuditService auditService;
 
-    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME, concurrency = "1") // Concurrency per evitare race conditions
+    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME, concurrency = "5-10") // Concurrency per evitare race conditions
     public void recoverData(
             EnergyReading energyReading,
             @Header(AmqpHeaders.MESSAGE_ID) String messageId) {
