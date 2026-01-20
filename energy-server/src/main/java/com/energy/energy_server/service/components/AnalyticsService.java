@@ -31,7 +31,7 @@ public class AnalyticsService {
     private final RabbitTemplate rabbitTemplate;
 
     private static final int REQUIRED_HISTORY_SIZE = 24;
-    private static final double ANOMALY_THRESHOLD_PERCENT = 20.0;
+    private static final double ANOMALY_THRESHOLD_PERCENT = 45;
 
     private static double maxdeviation = 0.0;
 
