@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.energy.energy_server.config.RabbitMQConfig;
 import org.slf4j.MDC;
@@ -40,6 +42,7 @@ public class SimulationService {
     @Getter
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private static final int ALERT_THRESHOLD = 25;
+    private static long entityCounter = 0L;
 
     @Getter
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -65,6 +68,7 @@ public class SimulationService {
         }
 
         energyRepository.save(entity);
+        entityCounter++;
         auditService.incrementDirect(); // Incremento salvataggio diretto
 
         // Log strutturato per salvataggio diretto su DB
@@ -91,7 +95,7 @@ public class SimulationService {
             // Alert con severità appropriata
             if (currentFailures == 1) {
                 MDC.put("alert_email", user);
-                log.error("🔴 DB_DOWN | First failure detected | User: {} | Switching to RabbitMQ fallback", user);
+                log.error("🔴 DB_STRESS | First failure detected | User: {} | Switching to RabbitMQ fallback", user);
             } else if (currentFailures % ALERT_THRESHOLD == 0) {
                 MDC.put("alert_email", user);
                 log.error("🔴 DB_STRESS | Failures: {} | User: {} | System under stress", currentFailures, user);
@@ -114,9 +118,9 @@ public class SimulationService {
 
     // Voglio rallentare analisi del csv quando il DB non risponde
     // cosi quando il DB torna sù, non ho tante entità che arriva a rabbit per essere processate
-    public long fallbackCount(Throwable t) {
+    public long fallbackCount(Throwable t) throws InterruptedException {
         log.warn("⚠️ DB Down: Rallento la simulazione a 1 riga al secondo...");
-        return 100; // Un numero >= 24 forzerà il delay di 1000ms nel Facade
+        return entityCounter;
     }
 
     private void ensureCorrelationId(EnergyReading entity) {

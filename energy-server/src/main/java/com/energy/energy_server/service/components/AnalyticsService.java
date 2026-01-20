@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.energy.energy_server.config.RabbitMQConfig;
 import com.energy.energy_server.dto.event.AnomalyEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AnalyticsService {
 
     private final EnergyRepository energyRepository;
@@ -30,6 +32,8 @@ public class AnalyticsService {
 
     private static final int REQUIRED_HISTORY_SIZE = 24;
     private static final double ANOMALY_THRESHOLD_PERCENT = 20.0;
+
+    private static double maxdeviation = 0.0;
 
     @Transactional(readOnly = true)
     public SystemReportDTO generateReport(EnergyReading current) {
@@ -54,6 +58,7 @@ public class AnalyticsService {
             List<EnergyReading> history = energyRepository.findTop100ByOrderByTimestampDesc();
             predicted = aiService.predictNextHour(history);
             if (actual > 0) deviation = Math.abs(predicted - actual) / actual * 100.0;
+            maxdeviation = Math.max(deviation, maxdeviation);
             anomaly = deviation > ANOMALY_THRESHOLD_PERCENT;
             message = anomaly ? "⚠️ Anomaly detected!" : "System Normal";
 
@@ -80,6 +85,7 @@ public class AnalyticsService {
         AiInsightDTO ai = new AiInsightDTO(anomaly, predicted, actual, deviation, message);
         List<ReadingDTO> readings = current != null ? Collections.singletonList(mapToDTO(current)) : Collections.emptyList();
 
+        log.info("massima deviazione {}", maxdeviation);
         return new SystemReportDTO(stats, readings, ai);
     }
 

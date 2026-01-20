@@ -85,11 +85,6 @@ public class RecoveryService {
 
         }
 
-//        catch (UnknownHostException e) {
-//            log.error("🔴 RECOVERY_FAILED | ID: {} | Reason: UNKNOWN_HOST | Action: Requeued", messageId);
-//            throw e;
-//
-//        }
         catch (Exception e) {
             // Altre eccezioni - Log più dettagliato
             log.error("❌ RECOVERY_ERROR | ID: {} | Reason: {} | Message: {} | Action: Message requeued",
