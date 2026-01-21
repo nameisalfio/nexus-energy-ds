@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RabbitMQ - Guida Completa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        h2 {
+            color: #667eea;
+            margin: 30px 0 15px 0;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: #ff6b6b;
+            margin: 25px 0 10px 0;
+            font-size: 1.4em;
+        }
+
+        .concept-box {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .flow-diagram {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 1.1em;
+            margin: 20px 0;
+            color: #1976d2;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            white-space: pre;
+            tab-size: 4;
+        }
+
+        .code-block .comment {
+            color: #6a9955;
+        }
+
+        .code-block .keyword {
+            color: #569cd6;
+        }
+
+        .code-block .string {
+            color: #ce9178;
+        }
+
+        .code-block .annotation {
+            color: #dcdcaa;
+        }
+
+        .code-block .class {
+            color: #4ec9b0;
+        }
+
+        .advantages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .advantage-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .advantage-card h4 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .step-box {
+            background: #e7f3ff;
+            border: 2px solid #2196F3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #2196F3;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        footer {
+            background: #2d2d2d;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .toc {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+
+        .toc li {
+            margin: 8px 0;
+        }
+
+        .toc a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🐰 RabbitMQ</h1>
+        <p>Guida Completa per Spring Boot</p>
+    </header>
+
+    <div class="content">
+        <div class="toc">
+            <h3 style="margin-top: 0; color: #333;">📚 Indice</h3>
+            <ul>
+                <li><a href="#cose">1. Cos'è RabbitMQ</a></li>
+                <li><a href="#concetti">2. Concetti Fondamentali</a></li>
+                <li><a href="#quando">3. Quando Usarlo</a></li>
+                <li><a href="#integrazione">4. Integrazione con Spring Boot</a></li>
+                <li><a href="#configurazione">5. Configurazione</a></li>
+                <li><a href="#scrivere">6. Scrivere Messaggi (Producer)</a></li>
+                <li><a href="#leggere">7. Leggere Messaggi (Consumer)</a></li>
+                <li><a href="#pattern">8. Pattern Comuni</a></li>
+            </ul>
+        </div>
+
+        <h2 id="cose">1. Cos'è RabbitMQ</h2>
+        <div class="concept-box">
+            <p><strong>RabbitMQ</strong> è un <strong>message broker open-source</strong> che implementa il protocollo AMQP (Advanced Message Queuing Protocol).</p>
+            <p style="margin-top: 10px;">In parole semplici: è un <strong>intermediario</strong> che riceve messaggi da applicazioni (producer) e li consegna ad altre applicazioni (consumer) in modo <strong>asincrono</strong> e <strong>affidabile</strong>.</p>
+        </div>
+
+        <div class="info-box">
+            <strong>🎯 Obiettivo principale:</strong> Disaccoppiare i sistemi, permettendo comunicazione asincrona tra servizi senza che debbano conoscersi direttamente.
+        </div>
+
+        <h2 id="concetti">2. Concetti Fondamentali</h2>
+
+        <h3>🔹 Producer (Produttore)</h3>
+        <p>Applicazione che <strong>invia messaggi</strong> a RabbitMQ.</p>
+
+        <h3>🔹 Queue (Coda)</h3>
+        <p>Struttura dati che <strong>memorizza i messaggi</strong> fino a quando non vengono consumati. È come una casella postale.</p>
+
+        <h3>🔹 Consumer (Consumatore)</h3>
+        <p>Applicazione che <strong>riceve e processa messaggi</strong> dalla coda.</p>
+
+        <h3>🔹 Exchange</h3>
+        <p>Componente che <strong>riceve messaggi dai producer e li instrada</strong> verso le code appropriate, basandosi su regole di routing.</p>
+
+        <h3>🔹 Binding</h3>
+        <p>Regola che collega un Exchange a una Queue, definendo come i messaggi devono essere instradati.</p>
+
+        <div class="flow-diagram">
+            Producer → Exchange → [Binding Rules] → Queue → Consumer
+        </div>
+
+        <h2 id="quando">3. Quando Usare RabbitMQ</h2>
+        <div class="advantages">
+            <div class="advantage-card">
+                <h4>🚀 Task Asincroni</h4>
+                <p>Invio email, generazione report, elaborazione immagini</p>
+            </div>
+            <div class="advantage-card">
+                <h4>📊 Load Balancing</h4>
+                <p>Distribuire carico di lavoro tra più worker</p>
+            </div>
+            <div class="advantage-card">
+                <h4>🔄 Event-Driven</h4>
+                <p>Architetture basate su eventi tra microservizi</p>
+            </div>
+            <div class="advantage-card">
+                <h4>⏱️ Task Scheduling</h4>
+                <p>Code di lavoro con priorità e ritardi</p>
+            </div>
+        </div>
+
+        <h2 id="integrazione">4. Integrazione con Spring Boot</h2>
+
+        <div class="step-box">
+            <h3 style="margin-top: 0;"><span class="step-number">1</span>Aggiungi la Dipendenza Maven</h3>
+            <div class="code-block">
+                <span class="keyword">&lt;dependency&gt;</span>
+                <span class="keyword">&lt;groupId&gt;</span>org.springframework.boot<span class="keyword">&lt;/groupId&gt;</span>
+                <span class="keyword">&lt;artifactId&gt;</span>spring-boot-starter-amqp<span class="keyword">&lt;/artifactId&gt;</span>
+                <span class="keyword">&lt;/dependency&gt;</span>
+            </div>
+        </div>
+
+        <div class="step-box">
+            <h3 style="margin-top: 0;"><span class="step-number">2</span>Configura application.properties</h3>
+            <div class="code-block">
+                <span class="comment"># Connessione a RabbitMQ</span>
+                spring.rabbitmq.host=localhost
+                spring.rabbitmq.port=5672
+                spring.rabbitmq.username=guest
+                spring.rabbitmq.password=guest
+
+                <span class="comment"># Opzionale: Virtual Host</span>
+                spring.rabbitmq.virtual-host=/
+
+                <span class="comment"># Opzionale: Configurazioni avanzate</span>
+                spring.rabbitmq.listener.simple.acknowledge-mode=auto
+                spring.rabbitmq.listener.simple.prefetch=1
+            </div>
+        </div>
+
+        <h2 id="configurazione">5. Configurazione delle Code</h2>
+
+        <div class="concept-box">
+            <p>Crea una classe di configurazione per definire <strong>Exchange, Queue e Binding</strong>:</p>
+        </div>
+
+        <div class="code-block"><span class="annotation">@Configuration</span>
+            <span class="keyword">public class</span> <span class="class">RabbitMQConfig</span> {
+
+            <span class="comment">// Nome della coda</span>
+            <span class="keyword">public static final</span> <span class="class">String</span> QUEUE_NAME = <span class="string">"my.queue"</span>;
+
+            <span class="comment">// Nome dell'exchange</span>
+            <span class="keyword">public static final</span> <span class="class">String</span> EXCHANGE_NAME = <span class="string">"my.exchange"</span>;
+
+            <span class="comment">// Routing key (chiave di instradamento)</span>
+            <span class="keyword">public static final</span> <span class="class">String</span> ROUTING_KEY = <span class="string">"my.routing.key"</span>;
+
+            <span class="comment">// Definisce la Queue</span>
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">Queue</span> queue() {
+            <span class="keyword">return new</span> <span class="class">Queue</span>(QUEUE_NAME, <span class="keyword">true</span>); <span class="comment">// true = durable (persiste su disco)</span>
+            }
+
+            <span class="comment">// Definisce l'Exchange (tipo Direct)</span>
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">DirectExchange</span> exchange() {
+            <span class="keyword">return new</span> <span class="class">DirectExchange</span>(EXCHANGE_NAME);
+            }
+
+            <span class="comment">// Collega Queue ed Exchange tramite Routing Key</span>
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">Binding</span> binding(<span class="class">Queue</span> queue, <span class="class">DirectExchange</span> exchange) {
+            <span class="keyword">return</span> <span class="class">BindingBuilder</span>
+            .bind(queue)
+            .to(exchange)
+            .with(ROUTING_KEY);
+            }
+
+            <span class="comment">// Bean per serializzazione JSON</span>
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">MessageConverter</span> jsonMessageConverter() {
+            <span class="keyword">return new</span> <span class="class">Jackson2JsonMessageConverter</span>();
+            }
+            }</div>
+
+        <div class="info-box">
+            <strong>📘 Tipi di Exchange:</strong><br>
+            • <strong>Direct</strong>: routing esatto tramite key<br>
+            • <strong>Topic</strong>: routing con pattern (es: "log.*", "order.#")<br>
+            • <strong>Fanout</strong>: broadcast a tutte le code collegate<br>
+            • <strong>Headers</strong>: routing basato su header del messaggio
+        </div>
+
+        <h2 id="scrivere">6. Scrivere Messaggi (Producer)</h2>
+
+        <h3>Metodo 1: Usando RabbitTemplate (Consigliato)</h3>
+        <div class="code-block"><span class="annotation">@Service</span>
+            <span class="keyword">public class</span> <span class="class">MessageProducer</span> {
+
+            <span class="annotation">@Autowired</span>
+            <span class="keyword">private</span> <span class="class">RabbitTemplate</span> rabbitTemplate;
+
+            <span class="comment">// Invio messaggio semplice (String)</span>
+            <span class="keyword">public void</span> sendMessage(<span class="class">String</span> message) {
+            rabbitTemplate.convertAndSend(
+            <span class="class">RabbitMQConfig</span>.EXCHANGE_NAME,
+            <span class="class">RabbitMQConfig</span>.ROUTING_KEY,
+            message
+            );
+            System.out.println(<span class="string">"Messaggio inviato: "</span> + message);
+            }
+
+            <span class="comment">// Invio oggetto complesso (viene serializzato in JSON)</span>
+            <span class="keyword">public void</span> sendOrder(<span class="class">Order</span> order) {
+            rabbitTemplate.convertAndSend(
+            <span class="class">RabbitMQConfig</span>.EXCHANGE_NAME,
+            <span class="class">RabbitMQConfig</span>.ROUTING_KEY,
+            order
+            );
+            }
+
+            <span class="comment">// Invio direttamente a una coda (senza exchange)</span>
+            <span class="keyword">public void</span> sendToQueue(<span class="class">String</span> message) {
+            rabbitTemplate.convertAndSend(<span class="class">RabbitMQConfig</span>.QUEUE_NAME, message);
+            }
+            }</div>
+
+        <h3>Metodo 2: Con Header Personalizzati</h3>
+        <div class="code-block"><span class="keyword">public void</span> sendWithHeaders(<span class="class">String</span> message) {
+            <span class="class">MessageProperties</span> props = <span class="keyword">new</span> <span class="class">MessageProperties</span>();
+            props.setHeader(<span class="string">"priority"</span>, <span class="string">"high"</span>);
+            props.setHeader(<span class="string">"userId"</span>, <span class="string">"12345"</span>);
+
+            <span class="class">Message</span> msg = <span class="keyword">new</span> <span class="class">Message</span>(message.getBytes(), props);
+
+            rabbitTemplate.send(
+            <span class="class">RabbitMQConfig</span>.EXCHANGE_NAME,
+            <span class="class">RabbitMQConfig</span>.ROUTING_KEY,
+            msg
+            );
+            }</div>
+
+        <h2 id="leggere">7. Leggere Messaggi (Consumer)</h2>
+
+        <h3>Metodo 1: Listener Semplice</h3>
+        <div class="code-block">
+            <span class="annotation">@Component</span>
+            <span class="keyword">public class</span> <span class="class">MessageConsumer</span> {
+
+            <span class="comment">// Ascolta la coda in modo automatico</span>
+            <span class="annotation">@RabbitListener</span>(queues = <span class="class">RabbitMQConfig</span>.QUEUE_NAME)
+            <span class="keyword">public void</span> receiveMessage(<span class="class">String</span> message) {
+            System.out.println(<span class="string">"Ricevuto: "</span> + message);
+            <span class="comment">// Processa il messaggio qui</span>
+            }
+            }
+        </div>
+
+        <h3>Metodo 2: Listener con Oggetti Complessi</h3>
+        <div class="code-block">
+            <span class="annotation">@RabbitListener</span>(queues = <span class="class">RabbitMQConfig</span>.QUEUE_NAME)
+            <span class="keyword">public void</span> receiveOrder(<span class="class">Order</span> order) {
+            System.out.println(<span class="string">"Nuovo ordine ricevuto: "</span> + order.getId());
+            <span class="comment">// Elabora l'ordine</span>
+            processOrder(order);
+            }
+        </div>
+
+        <h3>Metodo 3: Con Acknowledge Manuale</h3>
+        <div class="code-block">
+            <span class="annotation">@RabbitListener</span>(queues = <span class="class">RabbitMQConfig</span>.QUEUE_NAME,
+            ackMode = <span class="string">"MANUAL"</span>)
+            <span class="keyword">public void</span> receiveWithAck(<span class="class">String</span> message, <span class="class">Channel</span> channel,
+            <span class="annotation">@Header</span>(<span class="class">AmqpHeaders</span>.DELIVERY_TAG) <span class="keyword">long</span> tag)
+            <span class="keyword">throws</span> <span class="class">IOException</span> {
+
+            <span class="keyword">try</span> {
+            System.out.println(<span class="string">"Processando: "</span> + message);
+
+            <span class="comment">// Simula elaborazione</span>
+            Thread.sleep(1000);
+
+            <span class="comment">// Conferma ricezione (ACK)</span>
+            channel.basicAck(tag, <span class="keyword">false</span>);
+
+            } <span class="keyword">catch</span> (<span class="class">Exception</span> e) {
+            <span class="comment">// Rilascia il messaggio per riprova (NACK)</span>
+            channel.basicNack(tag, <span class="keyword">false</span>, <span class="keyword">true</span>);
+            }
+            }
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ Gestione degli Errori:</strong><br>
+            • <strong>ACK (Acknowledge):</strong> Messaggio processato con successo → viene rimosso dalla coda<br>
+            • <strong>NACK (Negative Acknowledge):</strong> Errore → messaggio può essere reinserito in coda<br>
+            • <strong>REJECT:</strong> Rifiuta il messaggio definitivamente
+        </div>
+
+        <h2 id="pattern">8. Pattern Comuni</h2>
+
+        <h3>🔸 Pattern Work Queue (Task Distribution)</h3>
+        <div class="concept-box">
+            <p>Più consumer ascoltano la stessa coda. RabbitMQ distribuisce i messaggi in modo round-robin.</p>
+            <p><strong>Uso:</strong> Distribuzione del carico di lavoro tra worker.</p>
+        </div>
+
+        <h3>🔸 Pattern Publish/Subscribe (Fanout)</h3>
+        <div class="code-block">
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">FanoutExchange</span> fanoutExchange() {
+            <span class="keyword">return new</span> <span class="class">FanoutExchange</span>(<span class="string">"notifications"</span>);
+            }
+
+            <span class="comment">// Ogni consumer riceve TUTTI i messaggi</span>
+            <span class="annotation">@RabbitListener</span>(queues = <span class="string">"email.queue"</span>)
+            <span class="keyword">public void</span> sendEmail(<span class="class">String</span> msg) { ... }
+
+            <span class="annotation">@RabbitListener</span>(queues = <span class="string">"sms.queue"</span>)
+            <span class="keyword">public void</span> sendSMS(<span class="class">String</span> msg) { ... }
+        </div>
+
+        <h3>🔸 Pattern Topic (Routing Flessibile)</h3>
+        <div class="code-block">
+            <span class="annotation">@Bean</span>
+            <span class="keyword">public</span> <span class="class">TopicExchange</span> topicExchange() {
+            <span class="keyword">return new</span> <span class="class">TopicExchange</span>(<span class="string">"logs"</span>);
+            }
+
+            <span class="comment">// Riceve solo log di errore</span>
+            <span class="annotation">@RabbitListener</span>(queues = <span class="string">"error.queue"</span>)
+            <span class="keyword">public void</span> logError(<span class="class">String</span> msg) { ... }
+
+            <span class="comment">// Routing keys: "log.error", "log.warning", "log.info"</span>
+            rabbitTemplate.convertAndSend(<span class="string">"logs"</span>, <span class="string">"log.error"</span>, <span class="string">"Critical error!"</span>);
+        </div>
+
+        <h3>🔸 Pattern RPC (Request/Reply)</h3>
+        <div class="code-block">
+            <span class="comment">// Invia richiesta e attendi risposta</span>
+            <span class="class">String</span> response = (<span class="class">String</span>) rabbitTemplate.convertSendAndReceive(
+            <span class="string">"rpc.exchange"</span>,
+            <span class="string">"rpc.key"</span>,
+            <span class="string">"calculate 10 + 5"</span>
+            );
+            System.out.println(<span class="string">"Risposta: "</span> + response);
+        </div>
+
+        <div class="info-box">
+            <strong>📦 Best Practices:</strong><br>
+            • Usa code <strong>durevoli</strong> (durable) per messaggi importanti<br>
+            • Implementa <strong>idempotenza</strong>: i consumer devono gestire messaggi duplicati<br>
+            • Configura <strong>Dead Letter Queue</strong> per messaggi falliti<br>
+            • Monitora le code tramite <strong>RabbitMQ Management UI</strong> (porta 15672)<br>
+            • Usa <strong>prefetch</strong> per limitare messaggi concorrenti per consumer
+        </div>
+
+        <h3>💡 Docker Compose Setup</h3>
+        <div class="code-block">
+            <span class="keyword">services:</span>
+            <span class="class">rabbitmq:</span>
+            <span class="keyword">image:</span> rabbitmq:3-management
+            <span class="keyword">ports:</span>
+            - <span class="string">"5672:5672"</span>   <span class="comment"># AMQP port</span>
+            - <span class="string">"15672:15672"</span> <span class="comment"># Management UI</span>
+            <span class="keyword">environment:</span>
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
+        </div>
+
+        <div class="step-box" style="background: #d4edda; border-color: #28a745;">
+            <h3 style="margin-top: 0; color: #155724;">🎯 Riepilogo Workflow</h3>
+            <ol style="padding-left: 20px; margin-top: 10px;">
+                <li><strong>Aggiungi dipendenza</strong> spring-boot-starter-amqp</li>
+                <li><strong>Configura connessione</strong> in application.properties</li>
+                <li><strong>Crea configurazione</strong> con Exchange, Queue, Binding</li>
+                <li><strong>Producer:</strong> Usa RabbitTemplate.convertAndSend()</li>
+                <li><strong>Consumer:</strong> Usa @RabbitListener su metodo</li>
+                <li><strong>Testa</strong> tramite Management UI su localhost:15672</li>
+            </ol>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>RabbitMQ + Spring Boot - Messaging Asincrono per Microservizi</p>
+    </footer>
+</div>
+</body>
+</html>
