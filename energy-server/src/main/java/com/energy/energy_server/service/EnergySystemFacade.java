@@ -43,7 +43,7 @@ public class EnergySystemFacade {
         analyticsService.clearHistory();
     }
 
-    // --- 1. GESTIONE UPLOAD ---
+    // --- 1. UPLOAD ---
     public void handleDatasetUpload(MultipartFile file) throws IOException {
         List<EnergyReading> data = ingestionService.parseCsv(file);
         auditService.reset(data.size()); // Inizializzazione audit
@@ -51,7 +51,7 @@ public class EnergySystemFacade {
         log.info("Dataset processed and queued.");
     }
 
-    // --- 2. GESTIONE SIMULAZIONE ---
+    // --- 2. SIMULATION ---
     @Async("taskExecutor")
     public void startSimulation() {
 
@@ -63,17 +63,18 @@ public class EnergySystemFacade {
 
             while (!simulationService.getIngestionQueue().isEmpty() && simulationService.getIsRunning().get()) {
                 try {
-                    // 1. Conteggio (protetto da Circuit Breaker)
+                    // 1. Counting (protected by Circuit Breaker)
                     long dbCount = simulationService.getRecordCount();
 
-                    // 2. Calcolo delay
+                    // 2. Calculate delay
                     TimeUnit.MILLISECONDS.sleep(dbCount >= REQUIRED_HISTORY_SIZE ? 500 : 50);
 
-                    // 3. Prelevo dalla coda
+                    // 3. Fetch from queue
                     EnergyReading entity = simulationService.getIngestionQueue().poll();
                     if (entity == null) break;
 
-                    // 4. Salvataggio (protetto da Circuit Breaker, salva su RabbitMQ)
+
+                    // 4. Save (protected by Circuit Breaker, also publishes to RabbitMQ)
                     simulationService.saveReading(entity);
 
                     // 5. Analytics

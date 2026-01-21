@@ -69,9 +69,9 @@ public class SimulationService {
 
         energyRepository.save(entity);
         entityCounter++;
-        auditService.incrementDirect(); // Incremento salvataggio diretto
+        auditService.incrementDirect(); // Direct save increment
 
-        // Log strutturato per salvataggio diretto su DB
+        // Structured log for direct DB save
         log.info("💾 DB_SAVE | ID: {} | Timestamp: {} | Temp: {}°C | Humidity: {}% | Energy: {} kWh",
                 entity.getCorrelationId(),
                 entity.getTimestamp(),
@@ -79,7 +79,7 @@ public class SimulationService {
                 entity.getHumidity(),
                 entity.getEnergyConsumption());
 
-        // Reset contatore fallimenti
+        // Reset failure counter
         if (consecutiveFailures.get() > 0) {
             log.info("✅ DATABASE_RECOVERED | Previous failures: {}", consecutiveFailures.get());
             consecutiveFailures.set(0);
@@ -92,7 +92,7 @@ public class SimulationService {
         String user = getUserForAlert();
 
         try {
-            // Alert con severità appropriata
+            // Alert with appropriate severity
             if (currentFailures == 1) {
                 MDC.put("alert_email", user);
                 log.error("🔴 DB_STRESS | First failure detected | User: {} | Switching to RabbitMQ fallback", user);
@@ -116,10 +116,8 @@ public class SimulationService {
         return energyRepository.count();
     }
 
-    // Voglio rallentare analisi del csv quando il DB non risponde
-    // cosi quando il DB torna sù, non ho tante entità che arriva a rabbit per essere processate
     public long fallbackCount(Throwable t) throws InterruptedException {
-        log.warn("⚠️ DB Down: Rallento la simulazione a 1 riga al secondo...");
+        log.warn("⚠️ DB is down: returning the counter from the last successful DB state");
         return entityCounter;
     }
 
@@ -145,9 +143,9 @@ public class SimulationService {
                     }
             );
 
-            auditService.incrementSent(); // Incremento invio a RabbitMQ
+            auditService.incrementSent(); // Increment sent to RabbitMQ
 
-            // Log strutturato per invio a RabbitMQ
+            // Structured log for RabbitMQ publishing
             log.info("📨 RABBITMQ_SEND | ID: {} | Timestamp: {} | Temp: {}°C | Humidity: {}% | Energy: {} kWh | Failures: {}",
                     entity.getCorrelationId(),
                     entity.getTimestamp(),

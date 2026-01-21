@@ -10,7 +10,6 @@ import com.energy.energy_server.model.EnergyReading;
 @Repository
 public interface EnergyRepository extends JpaRepository<EnergyReading, Long> {
 
-    // Corretto naming: Spring Data richiede 'existsBy' + NomeCampo
     boolean existsByCorrelationId(String correlationId);
 
     List<EnergyReading> findTop100ByOrderByTimestampDesc();

@@ -62,7 +62,7 @@ public class AnalyticsService {
             anomaly = deviation > ANOMALY_THRESHOLD_PERCENT;
             message = anomaly ? "⚠️ Anomaly detected!" : "System Normal";
 
-            // Se anomalia, spedisco a RabbitMQ
+            // If anomaly detected, send to RabbitMQ
             if (anomaly) {
                 AnomalyEvent anomalyEvent = new AnomalyEvent(
                         current.getTimestamp(),
@@ -73,7 +73,7 @@ public class AnalyticsService {
                         current.getId()
                 );
 
-                // Pub in modo asincrono
+                // Async Pub
                 rabbitTemplate.convertAndSend(
                         RabbitMQConfig.EXCHANGE_NAME,
                         "energy.anomaly.detected",
@@ -85,7 +85,7 @@ public class AnalyticsService {
         AiInsightDTO ai = new AiInsightDTO(anomaly, predicted, actual, deviation, message);
         List<ReadingDTO> readings = current != null ? Collections.singletonList(mapToDTO(current)) : Collections.emptyList();
 
-        log.info("massima deviazione {}", maxdeviation);
+        log.info("Max deviation {}", maxdeviation);
         return new SystemReportDTO(stats, readings, ai);
     }
 

@@ -19,7 +19,7 @@ public class AuditService {
         rabbitSent.set(0);
         rabbitReceived.set(0);
         dbDirectSaved.set(0);
-        log.info("📊 AUDIT RESET | Obiettivo: {} record", total);
+        log.info("📊 AUDIT RESET | Target: {} record", total);
     }
 
     public void incrementSent() {
@@ -35,7 +35,7 @@ public class AuditService {
     }
 
     public void logStatus() {
-        log.info("📊 AUDIT STATUS | CSV: {} | Inviati Rabbit: {} | Ricevuti Rabbit: {} | Salvati Diretti: {} | TOTALE DB stimato: {}",
+        log.info("📊 AUDIT STATUS | CSV: {} | Rabbit sent: {} | Rabbit received: {} | Direct Saved: {} | Estimated DB total: {}",
                 csvTotal.get(), rabbitSent.get(), rabbitReceived.get(), dbDirectSaved.get(),
                 (rabbitReceived.get() + dbDirectSaved.get()));
     }
