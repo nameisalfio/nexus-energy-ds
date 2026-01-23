@@ -33,10 +33,9 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistService blacklistService;
 
-    // internal DTOs 
     @Data
     static class AuthRequest {
-        private String username;
+        private String email;    
         private String password;
     }
 
@@ -54,7 +53,7 @@ public class AuthController {
         private String username;
         private String password;
         private String email;
-        private String role; // "USER" or "ADMIN"
+        private String role; 
     }
 
     @PostMapping("/register")
@@ -86,10 +85,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
         final String token = jwtService.generateToken(userDetails);
 
         return ResponseEntity.ok(new AuthResponse(token));
@@ -106,7 +105,6 @@ public class AuthController {
         return ResponseEntity.badRequest().body("Invalid token");
     }
 
-    // Docker Compose health check endpoint
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Server is Alive");

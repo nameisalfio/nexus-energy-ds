@@ -1,117 +1,74 @@
 package com.energy.energy_server.service;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
-
-import com.energy.energy_server.service.components.AuditService;
+import com.energy.energy_server.dto.SystemReportDTO;
+import com.energy.energy_server.dto.WeeklyStatsDTO;
+import com.energy.energy_server.model.EnergyReading;
+import com.energy.energy_server.repository.EnergyReadingRepository;
+import com.energy.energy_server.service.components.AnalyticsService;
+import com.energy.energy_server.service.components.IngestionService;
+import com.energy.energy_server.service.components.SimulationService;
 import jakarta.annotation.PostConstruct;
-import org.springframework.scheduling.annotation.Async;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.energy.energy_server.dto.SystemReportDTO;
-import com.energy.energy_server.dto.WeeklyStatsDTO;
-import com.energy.energy_server.model.EnergyReading;
-import com.energy.energy_server.service.components.AnalyticsService;
-import com.energy.energy_server.service.components.IngestionService;
-import com.energy.energy_server.service.components.SimulationService;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EnergySystemFacade {
 
-    // fine-grained dependencies
     private final IngestionService ingestionService;
     private final SimulationService simulationService;
     private final AnalyticsService analyticsService;
-    private final AuditService auditService;
+    private final EnergyReadingRepository energyReadingRepository;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
-    private static final int REQUIRED_HISTORY_SIZE = 24;
+
 
     @PostConstruct
     public void init() {
-        log.info("System Init & Cleanup");
+        log.info("NEXUS_CORE | System Startup: Purging old telemetry");
+        energyReadingRepository.deleteAllInBatch();
         analyticsService.clearHistory();
     }
 
-    // --- 1. UPLOAD ---
     public void handleDatasetUpload(MultipartFile file) throws IOException {
-        List<EnergyReading> data = ingestionService.parseCsv(file);
-        auditService.reset(data.size()); // Inizializzazione audit
-        simulationService.loadQueue(data);
-        log.info("Dataset processed and queued.");
+        try {
+            ingestionService.handleUpload(file);
+        } catch (Exception e) {
+            throw new IOException("Dataset ingestion rejected", e);
+        }
     }
 
-    // --- 2. SIMULATION ---
-    @Async("taskExecutor")
-    public void startSimulation() {
-
-        if (simulationService.getIsRunning().get()) return;
-        simulationService.getIsRunning().set(true);
-
-        CompletableFuture.runAsync(() -> {
-            log.info("Simulation Loop Started");
-
-            while (!simulationService.getIngestionQueue().isEmpty() && simulationService.getIsRunning().get()) {
-                try {
-                    // 1. Counting (protected by Circuit Breaker)
-                    long dbCount = simulationService.getRecordCount();
-
-                    // 2. Calculate delay
-                    TimeUnit.MILLISECONDS.sleep(dbCount >= REQUIRED_HISTORY_SIZE ? 500 : 50);
-
-                    // 3. Fetch from queue
-                    EnergyReading entity = simulationService.getIngestionQueue().poll();
-                    if (entity == null) break;
-
-
-                    // 4. Save (protected by Circuit Breaker, also publishes to RabbitMQ)
-                    simulationService.saveReading(entity);
-
-                    // 5. Analytics
-                    try {
-                        SystemReportDTO report = analyticsService.generateReport(entity);
-                        broadcast(report);
-                    } catch (Exception e) {
-                        log.error("Analytics skipped: Database is not available for real-time analysis.", e);
-                    }
-
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    log.error("Simulation Error", e);
-                }
-            }
-            simulationService.getIsRunning().set(false);
-            log.info("Simulation Loop Ended");
-        });
+    public void startSimulation() { 
+        simulationService.start(); 
     }
 
-    public void stopSimulation() {
-        simulationService.stop();
+    public void stopSimulation() { 
+        simulationService.stop(); 
     }
 
-    // --- 3. REPORTING ---
+    @EventListener
+    public void onTelemetryUpdate(EnergyReading reading) {
+        SystemReportDTO report = analyticsService.generateReport(reading);
+        broadcast(report);
+    }
+
     public SystemReportDTO getCurrentStatus() {
-        EnergyReading latest = analyticsService.getLatestReading();
-        return analyticsService.generateReport(latest);
+        return analyticsService.generateReport(analyticsService.getLatestReading());
     }
 
     public List<WeeklyStatsDTO> getWeeklyTrends() {
         return analyticsService.getWeeklyStats();
     }
 
-    // --- 4. STREAMING ---
     public SseEmitter subscribe() {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
         emitter.onCompletion(() -> emitters.remove(emitter));
@@ -124,9 +81,26 @@ public class EnergySystemFacade {
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event().name("update").data(payload));
-            } catch (IOException e) {
+            } catch (Exception e) {
                 emitters.remove(emitter);
             }
+        }
+    }
+
+    public void clearAllData() {
+        simulationService.stop();
+        energyReadingRepository.deleteAllInBatch();
+        analyticsService.clearHistory();
+        log.warn("NEXUS_CORE | Full purge executed manually");
+    }
+
+    @EventListener
+    public void handleTelemetryEvent(EnergyReading reading) {
+        try {
+            SystemReportDTO report = analyticsService.generateReport(reading);
+            broadcast(report);
+        } catch (Exception e) {
+            log.error("Error during real-time broadcast", e);
         }
     }
 }

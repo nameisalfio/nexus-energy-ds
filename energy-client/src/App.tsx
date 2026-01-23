@@ -88,23 +88,24 @@ function App() {
     if (!simulating || !token) return;
 
     console.log("Connecting SSE...");
-    const eventSource = new EventSource(`${API_BASE}/stream`); // SSE non supporta headers custom nativamente
+    const eventSource = new EventSource(`${API_BASE}/stream`); 
 
     eventSource.addEventListener("update", (event) => {
       const update: SystemReport = JSON.parse(event.data);
-      const newReading = update.recentReadings[0];
       
-      setLiveReadings(prev => [newReading, ...prev].slice(0, 15));
+      if (update.recentReadings && update.recentReadings.length > 0) {
+        const newReading = update.recentReadings[0];
+        
+        setLiveReadings(prev => {
+          if (prev.find(r => r.id === newReading.id)) return prev;
+          return [newReading, ...prev].slice(0, 30);
+        });
+      }
+      
       setReport(prev => {
         if (!prev) return update;
-        return { ...prev, stats: update.stats, aiInsights: update.aiInsights, recentReadings: [] };
+        return { ...prev, stats: update.stats, aiInsights: update.aiInsights };
       });
-
-      // Refresh Weekly in background
-      secureFetch(`${API_BASE}/stats/weekly`)
-        .then(res => res.json())
-        .then(data => setWeekly(data))
-        .catch(console.error);
     });
 
     eventSource.onerror = () => eventSource.close();
@@ -253,12 +254,12 @@ function App() {
                               <td>{r.humidity.toFixed(0)}%</td>
                               <td>{r.squareFootage.toFixed(0)}</td>
                               <td>{r.occupancy}</td>
-                              <td><span className={`badge ${r.hvacStatus === 'On' ? 'b-on' : 'b-off'}`}>{r.hvacStatus}</span></td>
-                              <td><span className={`badge ${r.lightingStatus === 'On' ? 'b-on' : 'b-off'}`}>{r.lightingStatus}</span></td>
+                              <td><span className={`badge ${r.hvacUsage === 'On' ? 'b-on' : 'b-off'}`}>{r.hvacUsage}</span></td>
+                              <td><span className={`badge ${r.lightingUsage === 'On' ? 'b-on' : 'b-off'}`}>{r.lightingUsage}</span></td>
                               <td>{r.renewableEnergy.toFixed(2)}</td>
                               <td>{r.dayOfWeek.substring(0,3)}</td>
                               <td>{r.holiday === 'Yes' ? <span className="badge b-holiday">YES</span> : <span style={{opacity:0.3}}>No</span>}</td>
-                              <td style={{color: '#fbbf24', fontWeight: 'bold'}}>{r.consumption.toFixed(2)}</td>
+                              <td style={{color: '#fbbf24', fontWeight: 'bold'}}>{r.energyConsumption.toFixed(2)}</td>
                             </tr>
                         ))}
                       </tbody>
@@ -276,7 +277,7 @@ function App() {
                     </div>
                     <div className="ai-body">
                       <div className="ai-metric"><span className="metric-label">AI Expected</span><span className="metric-val" style={{color: '#38bdf8'}}>{report.aiInsights.expectedValue?.toFixed(2)}</span></div>
-                      <div className="ai-metric"><span className="metric-label">Real Value</span><span className="metric-val" style={{color: '#fff'}}>{simulating && liveReadings.length > 0 ? liveReadings[0].consumption.toFixed(2) : report.aiInsights.actualValue?.toFixed(2)}</span></div>
+                      <div className="ai-metric"><span className="metric-label">Real Value</span><span className="metric-val" style={{color: '#fff'}}>{simulating && liveReadings.length > 0 ? liveReadings[0].energyConsumption.toFixed(2) : report.aiInsights.actualValue?.toFixed(2)}</span></div>
                       <div className="ai-metric"><span className="metric-label">Deviation</span><span className="metric-val" style={{color: report.aiInsights.anomalyDetected ? '#ef4444' : '#10b981'}}>{report.aiInsights.deviationPercent > 0 ? '+' : ''}{report.aiInsights.deviationPercent?.toFixed(1)}%</span></div>
                       <div className="suggestion-box" style={{borderColor: report.aiInsights.anomalyDetected ? '#ef4444' : '#38bdf8', color: report.aiInsights.anomalyDetected ? '#ef4444' : '#38bdf8', background: report.aiInsights.anomalyDetected ? 'rgba(239,68,68,0.1)' : 'rgba(56,189,248,0.1)'}}>{report.aiInsights.optimizationSuggestion}</div>
                     </div>

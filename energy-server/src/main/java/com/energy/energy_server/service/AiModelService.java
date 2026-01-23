@@ -13,13 +13,23 @@ import org.springframework.stereotype.Service;
 
 import com.energy.energy_server.ai.ModelConfig;
 import com.energy.energy_server.model.EnergyReading;
+import com.energy.energy_server.dto.AiInsightDTO;
+import com.energy.energy_server.repository.EnergyReadingRepository;
 
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AiModelService {
+
+    private static final double ANOMALY_THRESHOLD = 0.2; // 20% allowed deviation
+    private static final String MSG_ANOMALY = "Anomaly detected: consumption deviates from expected pattern.";
+    private static final String MSG_NORMAL = "System operating within normal parameters.";
+
+    private final EnergyReadingRepository energyReadingRepository;
 
     private MultiLayerNetwork model;
     private DataNormalization normalizer;
@@ -31,46 +41,68 @@ public class AiModelService {
             File modelFile = new File(ModelConfig.MODEL_EXPORT_PATH);
             if (modelFile.exists()) {
                 model = ModelSerializer.restoreMultiLayerNetwork(modelFile);
-                log.info("✅ AI Model loaded successfully from: {}", modelFile.getAbsolutePath());
+                log.info("AI Model loaded successfully from: {}", modelFile.getAbsolutePath());
             } else {
-                log.error("❌ Model file not found at {}. Did you run Train.java?", modelFile.getAbsolutePath());
+                log.error("Model file not found at {}.", modelFile.getAbsolutePath());
             }
 
             // Load Normalizer
             File normFile = new File(ModelConfig.NORMALIZER_EXPORT_PATH);
             if (normFile.exists()) {
                 normalizer = NormalizerSerializer.getDefault().restore(normFile);
-                log.info("✅ Normalizer loaded successfully.");
+                log.info("Normalizer loaded successfully.");
             } else {
-                log.error("❌ Normalizer file not found!");
+                log.error("Normalizer file not found.");
             }
-
         } catch (Exception e) {
-            log.error("🔥 Critical Error loading AI components", e);
+            log.error("Error loading AI components", e);
         }
     }
 
-    public double predictNextHour(List<EnergyReading> history) {
-        if (model == null || normalizer == null) {
-            // log.warn("AI not ready."); // Uncomment for debug
-            return 0.0;
+    public AiInsightDTO analyze(EnergyReading reading) {
+        // Retrieve historical data sorted by timestamp (most recent first)
+        List<EnergyReading> history = energyReadingRepository.findTop100ByOrderByTimestampDesc();
+
+        // Limit the history to the required time steps for the model
+        if (history.size() > ModelConfig.TIME_STEPS) {
+            history = history.subList(0, ModelConfig.TIME_STEPS);
         }
 
-        int timeSteps = ModelConfig.TIME_STEPS; // 24
-        if (history.size() < timeSteps) {
-            return 0.0;
+        double predicted = predictNextHour(history);
+        
+        // Use the actual current value for comparison
+        double actual = reading.getEnergyConsumption() != null ? reading.getEnergyConsumption() : 0.0;
+        
+        boolean anomaly = Math.abs(predicted - actual) > (predicted * ANOMALY_THRESHOLD); 
+        double deviation = predicted > 0 ? ((actual - predicted) / predicted) * 100 : 0.0;
+
+        return new AiInsightDTO(
+            anomaly,
+            predicted,
+            actual,
+            deviation,
+            anomaly ? MSG_ANOMALY : MSG_NORMAL
+        );
+    }
+
+    public double predictNextHour(List<EnergyReading> history) {
+        if (model == null || normalizer == null || history.isEmpty()) return 0.0;
+        
+        // Fallback to the latest known value if history is insufficient
+        if (history.size() < ModelConfig.TIME_STEPS) {
+             return history.get(0).getEnergyConsumption() != null ? history.get(0).getEnergyConsumption() : 0.0;
         }
 
         try {
-            // Create 3D Input Tensor: [1 sample, 4 features, 24 steps]
+            int timeSteps = ModelConfig.TIME_STEPS;
             INDArray input = Nd4j.create(new int[]{1, ModelConfig.INPUT_FEATURES, timeSteps});
 
             for (int t = 0; t < timeSteps; t++) {
-                // Reverse order mapping: 0 (Network Input Start) -> 23 (Oldest History Item)
+                // history is sorted DESC. We map it to the time steps expected by the model.
+                // t=0 (start) -> oldest record
+                // t=23 (end) -> most recent record
                 EnergyReading r = history.get(timeSteps - 1 - t);
-
-                // --- SAFE UNBOXING FIX ---
-                // Prevent NullPointerException if DB has missing values
+                
                 double temp = r.getTemperature() != null ? r.getTemperature() : 0.0;
                 double hum = r.getHumidity() != null ? r.getHumidity() : 0.0;
                 double occ = r.getOccupancy() != null ? r.getOccupancy() : 0.0;
@@ -82,17 +114,15 @@ public class AiModelService {
                 input.putScalar(new int[]{0, 3, t}, cons);
             }
 
-            // Normalize & Predict
             normalizer.transform(input);
             INDArray output = model.output(input);
             normalizer.revertLabels(output);
 
-            double prediction = output.getDouble(0, 0, timeSteps - 1);
-            return Math.max(0.0, prediction);
+            return Math.max(0.0, output.getDouble(0, 0, timeSteps - 1));
 
         } catch (Exception e) {
             log.error("AI Prediction failed", e);
-            return -1.0;
+            return 0.0;
         }
     }
 }

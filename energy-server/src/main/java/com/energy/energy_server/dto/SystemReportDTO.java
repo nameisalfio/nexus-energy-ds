@@ -1,14 +1,27 @@
 package com.energy.energy_server.dto;
 
 import java.util.List;
+import com.energy.energy_server.model.EnergyReading;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/**
- * Coarse-grained object containing the full state of the system.
- * This DTO aggregates raw data, statistical analysis, and AI insights
- * to minimize network round-trips.
- */
-public record SystemReportDTO(
-    GlobalStatsDTO stats,
-    List<ReadingDTO> recentReadings,
-    AiInsightDTO aiInsights
-) {}
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class SystemReportDTO {
+    
+    private StatsDTO stats;
+    private AiInsightDTO aiInsights;
+    private List<EnergyReading> recentReadings;
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class StatsDTO {
+        private double averageTemperature;
+        private double totalEnergyConsumption;
+        private double peakLoad;
+        private long totalRecords;
+    }
+}

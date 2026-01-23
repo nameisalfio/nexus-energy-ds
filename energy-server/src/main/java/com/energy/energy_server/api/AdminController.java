@@ -1,0 +1,38 @@
+package com.energy.energy_server.api;
+
+import com.energy.energy_server.model.User;
+import com.energy.energy_server.repository.UserRepository;
+import com.energy.energy_server.service.EnergySystemFacade;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')") 
+@RequiredArgsConstructor
+public class AdminController {
+
+    private final UserRepository userRepository;
+    private final EnergySystemFacade facade;
+
+    @GetMapping("/users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        userRepository.deleteById(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/data/clear")
+    public ResponseEntity<?> clearDatabase() {
+        facade.clearAllData();
+        return ResponseEntity.ok("Database cleared. Ready for a new CSV.");
+    }
+}

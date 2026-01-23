@@ -23,7 +23,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String username;
 
     @Column(nullable = false)
@@ -33,7 +33,7 @@ public class User {
     private String email;
 
     @Enumerated(EnumType.STRING)
-    private Role role; // ADMIN or USER
+    private Role role; 
 
     public enum Role {
         USER, ADMIN
