@@ -1,5 +1,7 @@
 package com.energy.energy_server.api;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -53,7 +55,6 @@ public class AuthController {
         private String username;
         private String password;
         private String email;
-        private String role; 
     }
 
     @PostMapping("/register")
@@ -62,24 +63,42 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Email already taken");
         }
 
-        User.Role role = User.Role.USER;
-        try {
-            if (request.getRole() != null && !request.getRole().isEmpty()) {
-                role = User.Role.valueOf(request.getRole().toUpperCase());
-            }
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid Role. Use USER or ADMIN");
-        }
+        User.Role defaultRole = User.Role.USER;
 
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
-                .role(role)
+                .role(defaultRole) 
                 .build();
 
         userRepository.save(user);
         return ResponseEntity.ok("User registered successfully");
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
+    @PostMapping("/users/change-role")
+    public ResponseEntity<?> changeRole(@RequestBody RoleChangeRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        try {
+            user.setRole(User.Role.valueOf(request.getNewRole().toUpperCase()));
+            userRepository.save(user);
+            return ResponseEntity.ok("Role updated to " + request.getNewRole());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("Invalid role");
+        }
+    }
+
+    @Data
+    static class RoleChangeRequest {
+        private String email;
+        private String newRole;
     }
 
     @PostMapping("/login")

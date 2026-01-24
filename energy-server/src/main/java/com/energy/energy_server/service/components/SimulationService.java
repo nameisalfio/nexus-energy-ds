@@ -38,7 +38,7 @@ public class SimulationService {
     @Getter
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     
-    private static final int FIXED_RATE_MS = 1000;
+    private static final int FIXED_RATE_MS = 2000;
     private static final int BURST_SIZE = 24;
     private static long entityCounter = 0L;
 
