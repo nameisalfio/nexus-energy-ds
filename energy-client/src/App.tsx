@@ -51,9 +51,22 @@ function App() {
       return res;
   };
 
+  const handleClearDb = async () => {
+    try {
+      await secureFetch(`${API_BASE}/admin/data/clear`, { method: 'DELETE' });
+      setReport(null);
+      setWeekly([]);
+      setLiveReadings([]);
+      setSimulating(false);
+    } catch (e: any) {
+      console.error("Purge failed during login/action:", e);
+    }
+  };
+
   const fetchData = async () => {
     if (!token) return;
     try {
+      handleClearDb();
       setLoading(true);
       setError(null);
       const [resReport, resWeekly] = await Promise.all([
@@ -182,6 +195,10 @@ function App() {
                 📂 Load CSV
                 <input type="file" onChange={handleUpload} accept=".csv" style={{display: 'none'}} />
               </label>
+
+              <button className="btn" style={{background: '#475569'}} onClick={handleClearDb}>
+                🗑 Purge
+              </button>
 
               <button className="btn" style={{background: '#6366f1'}} onClick={() => {
                   setShowUserMgmt(!showUserMgmt);
