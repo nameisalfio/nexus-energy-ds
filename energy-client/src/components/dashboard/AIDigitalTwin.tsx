@@ -1,143 +1,89 @@
-import { Brain, Sparkles, AlertTriangle, Info } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AIInsight } from "@/types/reading";
 
 interface AIDigitalTwinProps {
-  insights: AIInsight[];
+  insight: string;      
+  expectedValue: number;
+  realValue: number;
+  deviation: number;
+  confidence: number;
   isActive: boolean;
-  expectedValue?: number;
-  realValue?: number;
 }
 
 export function AIDigitalTwin({
-  insights,
-  isActive,
-  expectedValue = 2847,
-  realValue = 2934,
+  insight,
+  expectedValue = 0,
+  realValue = 0,
+  deviation = 0,
+  confidence = 0,
+  isActive
 }: AIDigitalTwinProps) {
-  const deviation = ((realValue - expectedValue) / expectedValue) * 100;
+  const isHighDeviation = Math.abs(deviation) > 15;
+  const isLoss = realValue > expectedValue;
 
   return (
-    <div className="glass-card-elevated p-6 animate-fade-in">
+    <div className={cn(
+      "glass-card-elevated p-6 h-full border-l-4 transition-all duration-500",
+      isHighDeviation ? "border-l-status-error" : "border-l-status-online"
+    )}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Brain className="h-6 w-6 text-primary" />
-            {isActive && (
-              <span className="absolute -right-1 -top-1 status-online pulse-glow" />
-            )}
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Brain className={cn("h-6 w-6 text-primary", isActive && "animate-pulse")} />
           </div>
           <div>
-            <h3 className="font-semibold">AI Digital Twin</h3>
-            <p className="text-xs text-muted-foreground">
-              Predictive Analytics Engine
-            </p>
+            <h3 className="font-bold text-sm uppercase tracking-widest">AI Digital Twin</h3>
+            <p className="text-[10px] text-muted-foreground font-mono">Confidence: {confidence.toFixed(1)}%</p>
           </div>
         </div>
-        <div
-          className={cn(
-            "flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
-            isActive
-              ? "bg-status-online/10 text-status-online"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              isActive ? "bg-status-online animate-pulse" : "bg-muted-foreground"
-            )}
-          />
-          {isActive ? "Active" : "Idle"}
+        <div className={cn(
+          "px-2 py-1 rounded text-[10px] font-black border",
+          isHighDeviation ? "bg-status-error/10 text-status-error border-status-error/20" : "bg-status-online/10 text-status-online border-status-online/20"
+        )}>
+          {isHighDeviation ? "ANOMALY" : "OPTIMIZED"}
         </div>
       </div>
 
-      {/* Deviation Display */}
-      <div className="mt-6 rounded-xl bg-secondary/50 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="data-label">AI Expected</p>
-            <p className="data-value text-lg">{expectedValue.toLocaleString()} kWh</p>
+      {/* Value Comparison */}
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50">
+          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">AI Prediction</p>
+          <p className="text-xl font-mono font-bold">{expectedValue.toFixed(2)}</p>
+        </div>
+        <div className="bg-secondary/20 p-4 rounded-xl border border-border/50">
+          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Actual Value</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xl font-mono font-bold">{realValue.toFixed(2)}</p>
+            {isLoss ? <TrendingUp className="h-4 w-4 text-status-error" /> : <TrendingDown className="h-4 w-4 text-status-online" />}
           </div>
-          <div className="h-8 w-px bg-border" />
-          <div>
-            <p className="data-label">Real Value</p>
-            <p className="data-value text-lg">{realValue.toLocaleString()} kWh</p>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div>
-            <p className="data-label">Deviation</p>
-            <p
-              className={cn("text-lg font-mono font-medium", {
-                "text-status-online": Math.abs(deviation) < 3,
-                "text-status-warning": Math.abs(deviation) >= 3 && Math.abs(deviation) < 5,
-                "text-status-error": Math.abs(deviation) >= 5,
-              })}
-            >
-              {deviation > 0 ? "+" : ""}
-              {deviation.toFixed(1)}%
-            </p>
-          </div>
+          <p className={cn("text-[10px] font-bold mt-1", isHighDeviation ? "text-status-error" : "text-status-online")}>
+            {deviation > 0 ? "+" : ""}{deviation.toFixed(2)}% dev
+          </p>
         </div>
       </div>
 
-      {/* Insights */}
-      <div className="mt-6">
-        <h4 className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Optimization Suggestions
+      {/* Dynamic Suggestions Section */}
+      <div className="space-y-3">
+        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+          <Sparkles className="h-3 w-3" /> Optimization Strategy
         </h4>
-        <div className="mt-3 space-y-3">
-          {insights.map((insight) => (
-            <div
-              key={insight.id}
-              className={cn(
-                "rounded-lg border p-3 transition-colors",
-                {
-                  "border-status-online/30 bg-status-online/5":
-                    insight.type === "optimization",
-                  "border-status-warning/30 bg-status-warning/5":
-                    insight.type === "warning",
-                  "border-primary/30 bg-primary/5": insight.type === "info",
-                }
+        <div className={cn(
+          "rounded-xl border p-4 transition-colors",
+          isHighDeviation ? "bg-status-warning/5 border-status-warning/20" : "bg-status-online/5 border-status-online/20"
+        )}>
+          <div className="flex items-start gap-3">
+            <div className={cn("mt-0.5 rounded p-1.5", isHighDeviation ? "bg-status-warning/20" : "bg-status-online/20")}>
+              {isHighDeviation ? (
+                <AlertTriangle className="h-4 w-4 text-status-warning" />
+              ) : (
+                <CheckCircle className="h-4 w-4 text-status-online" />
               )}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={cn("mt-0.5 rounded p-1", {
-                    "bg-status-online/20": insight.type === "optimization",
-                    "bg-status-warning/20": insight.type === "warning",
-                    "bg-primary/20": insight.type === "info",
-                  })}
-                >
-                  {insight.type === "optimization" && (
-                    <Sparkles className="h-3.5 w-3.5 text-status-online" />
-                  )}
-                  {insight.type === "warning" && (
-                    <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
-                  )}
-                  {insight.type === "info" && (
-                    <Info className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{insight.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {insight.description}
-                  </p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <span className="text-xs font-medium text-primary">
-                      {insight.impact}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {insight.confidence}% confidence
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
-          ))}
+            <p className="text-xs italic leading-relaxed text-foreground/90 font-medium">
+              "{insight || "Initializing predictive analysis for current infrastructure cycle..."}"
+            </p>
+          </div>
         </div>
       </div>
     </div>

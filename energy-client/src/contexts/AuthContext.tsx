@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
-
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 export type UserRole = "ADMIN" | "USER";
 
-interface User {
+export interface User {
   id: string;
   username: string;
   email: string;
@@ -10,160 +9,74 @@ interface User {
   token: string;
 }
 
-interface RegisteredUser {
-  id: string;
-  username: string;
-  email: string;
-  password: string;
-  role: UserRole;
-}
-
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  registeredUsers: RegisteredUser[];
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  changeUserRole: (userId: string, newRole: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const API_BASE = "http://localhost:8081/api";
 
-// Default admin user for testing
-const defaultUsers: RegisteredUser[] = [
-  {
-    id: "admin-1",
-    username: "admin",
-    email: "admin@nexus.com",
-    password: "admin123",
-    role: "ADMIN",
-  },
-  {
-    id: "user-1",
-    username: "observer",
-    email: "user@nexus.com",
-    password: "user123",
-    role: "USER",
-  },
-];
+export function AuthProvider({ children }: { readonly children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem("nexus-user");
-    return stored ? JSON.parse(stored) : null;
-  });
-
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
-    const stored = localStorage.getItem("nexus-registered-users");
-    return stored ? JSON.parse(stored) : defaultUsers;
-  });
-
-  const login = useCallback(async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    const foundUser = registeredUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    
-    if (!foundUser) {
-      throw new Error("Invalid email or password");
+  const login = useCallback(async (email: string, password: string): Promise<User> => {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Invalid credentials");
     }
-    
-    const loggedInUser: User = {
-      id: foundUser.id,
-      username: foundUser.username,
-      email: foundUser.email,
-      role: foundUser.role,
-      token: `mock-jwt-token-${Date.now()}`,
+  
+    const data = await response.json();
+    const userRole = data.role ? data.role.toUpperCase() : "USER";
+  
+    const userData: User = {
+      id: data.id || "temp-id",
+      username: data.username || "User",
+      email: email,
+      role: userRole as UserRole,
+      token: data.token
     };
-    
-    setUser(loggedInUser);
-    localStorage.setItem("nexus-user", JSON.stringify(loggedInUser));
-  }, [registeredUsers]);
+  
+    setUser(userData);
+    return userData; 
+  }, []);
 
   const register = useCallback(async (username: string, email: string, password: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Check if email already exists
-    const existingUser = registeredUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-    
-    if (existingUser) {
-      throw new Error("Email already registered");
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Registration failed");
     }
-    
-    // Check if username already exists
-    const existingUsername = registeredUsers.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase()
-    );
-    
-    if (existingUsername) {
-      throw new Error("Username already taken");
-    }
-    
-    const newUser: RegisteredUser = {
-      id: `user-${Date.now()}`,
-      username,
-      email,
-      password,
-      role: "USER", // Default role is USER
-    };
-    
-    const updatedUsers = [...registeredUsers, newUser];
-    setRegisteredUsers(updatedUsers);
-    localStorage.setItem("nexus-registered-users", JSON.stringify(updatedUsers));
-    
-    // Auto-login after registration
-    const loggedInUser: User = {
-      id: newUser.id,
-      username: newUser.username,
-      email: newUser.email,
-      role: newUser.role,
-      token: `mock-jwt-token-${Date.now()}`,
-    };
-    
-    setUser(loggedInUser);
-    localStorage.setItem("nexus-user", JSON.stringify(loggedInUser));
-  }, [registeredUsers]);
+  }, []);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem("nexus-user");
   }, []);
 
-  const changeUserRole = useCallback((userId: string, newRole: UserRole) => {
-    setRegisteredUsers((prev) => {
-      const updated = prev.map((u) =>
-        u.id === userId ? { ...u, role: newRole } : u
-      );
-      localStorage.setItem("nexus-registered-users", JSON.stringify(updated));
-      return updated;
-    });
-    
-    // If the currently logged-in user's role was changed, update their session
-    if (user && user.id === userId) {
-      const updatedUser = { ...user, role: newRole };
-      setUser(updatedUser);
-      localStorage.setItem("nexus-user", JSON.stringify(updatedUser));
-    }
-  }, [user]);
+  const authValue = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    login,
+    register,
+    logout,
+  }), [user, login, register, logout]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        registeredUsers,
-        login,
-        register,
-        logout,
-        changeUserRole,
-      }}
-    >
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -171,8 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 }

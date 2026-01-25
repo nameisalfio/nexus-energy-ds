@@ -62,26 +62,26 @@ public class AnalyticsService {
     }
 
     public List<WeeklyStatsDTO> getWeeklyStats() {
-    List<EnergyReading> readings = energyReadingRepository.findAll();
+        List<EnergyReading> readings = energyReadingRepository.findAll();
 
-    Map<String, Double> statsMap = new LinkedHashMap<>();
-    String[] daysLong = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
-    String[] daysShort = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-    
-    for (String s : daysShort) statsMap.put(s, 0.0);
+        Map<String, Double> statsMap = new LinkedHashMap<>();
+        String[] daysLong = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+        String[] daysShort = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        
+        for (String s : daysShort) statsMap.put(s, 0.0);
 
-    readings.forEach(r -> {
-        String dayFromCsv = r.getDayOfWeek(); 
-        for (int i = 0; i < daysLong.length; i++) {
-            if (daysLong[i].equalsIgnoreCase(dayFromCsv)) {
-                statsMap.merge(daysShort[i], r.getEnergyConsumption(), 
-                    (oldV, newV) -> (oldV == 0.0) ? newV : (oldV + newV) / 2);
+        readings.forEach(r -> {
+            String dayFromCsv = r.getDayOfWeek(); 
+            for (int i = 0; i < daysLong.length; i++) {
+                if (daysLong[i].equalsIgnoreCase(dayFromCsv)) {
+                    statsMap.merge(daysShort[i], r.getEnergyConsumption(), 
+                        (oldV, newV) -> (oldV == 0.0) ? newV : (oldV + newV) / 2);
+                }
             }
-        }
-    });
+        });
 
-    return statsMap.entrySet().stream()
-        .map(entry -> new WeeklyStatsDTO(entry.getKey(), entry.getValue()))
-        .collect(Collectors.toList());
-}
+        return statsMap.entrySet().stream()
+            .map(entry -> new WeeklyStatsDTO(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList());
+    }
 }

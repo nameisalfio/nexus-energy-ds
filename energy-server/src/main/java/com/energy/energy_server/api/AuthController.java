@@ -20,6 +20,7 @@ import com.energy.energy_server.security.JwtService;
 import com.energy.energy_server.security.TokenBlacklistService;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
@@ -36,25 +37,32 @@ public class AuthController {
     private final TokenBlacklistService blacklistService;
 
     @Data
+    @AllArgsConstructor
     static class AuthRequest {
         private String email;    
         private String password;
     }
 
     @Data
-    static class AuthResponse {
-        private String token;
-
-        public AuthResponse(String t) {
-            this.token = t;
-        }
+    static class RoleChangeRequest {
+        private String email;
+        private String newRole;
     }
 
     @Data
+    @AllArgsConstructor
     static class RegisterRequest {
         private String username;
         private String password;
         private String email;
+    }
+
+    @Data
+    @AllArgsConstructor
+    static class AuthResponse {
+        private String token;
+        private String username;
+        private String role;
     }
 
     @PostMapping("/register")
@@ -95,22 +103,17 @@ public class AuthController {
         }
     }
 
-    @Data
-    static class RoleChangeRequest {
-        private String email;
-        private String newRole;
-    }
-
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
+        final User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
         final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
         final String token = jwtService.generateToken(userDetails);
-
-        return ResponseEntity.ok(new AuthResponse(token));
+        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().name()));
     }
 
     @PostMapping("/logout")

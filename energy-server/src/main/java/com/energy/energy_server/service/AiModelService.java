@@ -60,29 +60,38 @@ public class AiModelService {
     }
 
     public AiInsightDTO analyze(EnergyReading reading) {
-        // Retrieve historical data sorted by timestamp (most recent first)
         List<EnergyReading> history = energyReadingRepository.findTop100ByOrderByTimestampDesc();
-
-        // Limit the history to the required time steps for the model
-        if (history.size() > ModelConfig.TIME_STEPS) {
-            history = history.subList(0, ModelConfig.TIME_STEPS);
-        }
-
         double predicted = predictNextHour(history);
-        
-        // Use the actual current value for comparison
         double actual = reading.getEnergyConsumption() != null ? reading.getEnergyConsumption() : 0.0;
         
-        boolean anomaly = Math.abs(predicted - actual) > (predicted * ANOMALY_THRESHOLD); 
         double deviation = predicted > 0 ? ((actual - predicted) / predicted) * 100 : 0.0;
-
+        boolean anomaly = Math.abs(deviation) > (ANOMALY_THRESHOLD * 100);
+    
+        String suggestion = generateSmartSuggestion(reading, actual, predicted, deviation);
+    
         return new AiInsightDTO(
             anomaly,
             predicted,
             actual,
             deviation,
-            anomaly ? MSG_ANOMALY : MSG_NORMAL
+            suggestion
         );
+    }
+    
+    private String generateSmartSuggestion(EnergyReading r, double actual, double predicted, double dev) {
+        if (dev > 10 && r.getOccupancy() < 10) {
+            return "High consumption detected in near-empty zone. Check for ghost loads or active HVAC in unused areas.";
+        }
+        
+        if (r.getRenewableEnergy() > 40 && r.getHvacUsage().equalsIgnoreCase("OFF")) {
+            return "Peak renewable generation active. Strategic window for high-load maintenance or pre-cooling.";
+        }
+    
+        if (r.getTemperature() > 26 && r.getHvacUsage().equalsIgnoreCase("OFF")) {
+            return "Thermal threshold exceeded. AI suggests activating HVAC Stage 1 to prevent peak demand spikes later.";
+        }
+    
+        return dev < 0 ? "System performing above efficiency baseline." : "Operational parameters nominal.";
     }
 
     public double predictNextHour(List<EnergyReading> history) {

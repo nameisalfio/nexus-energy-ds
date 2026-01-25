@@ -1,165 +1,153 @@
-import { useState, useCallback, useMemo } from "react";
-import {
-  Thermometer,
-  Droplets,
-  Zap,
-  Leaf,
-} from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Thermometer, Zap, Activity, TrendingUp, Brain, BarChart3, Calendar } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AccessControlPanel } from "@/components/admin/AccessControlPanel";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { WeeklyTrendsChart } from "@/components/dashboard/WeeklyTrendsChart";
 import { ReadingsTable } from "@/components/dashboard/ReadingsTable";
-import type { SystemStatus, Reading, WeeklyStat } from "@/types/reading";
+import { AIDigitalTwin } from "@/components/dashboard/AIDigitalTwin";
+import { ConsumptionStreamChart } from "@/components/dashboard/ConsumptionStreamChart";
+import { WeeklyEfficiencyChart } from "@/components/dashboard/WeeklyEfficiencyChart";
+import { useAuth } from "@/contexts/AuthContext";
+import type { SystemStatus, SystemReport, WeeklyStat } from "@/types/types";
 import { toast } from "sonner";
 
-const generateMockReading = (index: number): Reading => ({
-  id: `reading-${Date.now()}-${index}`,
-  timestamp: new Date(Date.now() - index * 30000),
-  temperature: 20 + Math.random() * 8,
-  humidity: 40 + Math.random() * 25,
-  area: [`Zone A-1`, `Zone B-2`, `Zone C-3`, `Zone B-4`, `Zone A-2`][index % 5],
-  occupancy: Math.floor(Math.random() * 80),
-  hvacStatus: ["ON", "OFF", "AUTO"][Math.floor(Math.random() * 3)],
-  lightLevel: 200 + Math.random() * 500,
-  renewablePercent: Math.floor(40 + Math.random() * 50),
-  dayType: "Weekday",
-  isHoliday: false,
-  energyLoad: 100 + Math.random() * 300,
-});
-
-const getDayName = (date: Date): string => {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return days[date.getDay()];
-};
+const API_BASE = "http://localhost:8081/api";
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [systemStatus, setSystemStatus] = useState<SystemStatus>("IDLE");
-  const [totalRecords, setTotalRecords] = useState(24567);
-  const [readings, setReadings] = useState<Reading[]>(() =>
-    Array.from({ length: 8 }, (_, i) => generateMockReading(i))
-  );
+  const [report, setReport] = useState<SystemReport | null>(null);
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([]);
   const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
+  const [isDatasetLoaded, setIsDatasetLoaded] = useState(false);
 
-  // Compute weekly data from readings dynamically
-  const weeklyData = useMemo<WeeklyStat[]>(() => {
-    const dayMap: Record<string, { actual: number; predicted: number; renewable: number; count: number }> = {
-      Mon: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Tue: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Wed: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Thu: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Fri: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Sat: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-      Sun: { actual: 0, predicted: 0, renewable: 0, count: 0 },
-    };
+  // Data Fetching: Infrastructure Report
+  const fetchStatus = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/full-report`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (!response.ok) throw new Error();
+      const data: SystemReport = await response.json();
+      setReport(data);
+    } catch (error) {
+      console.error("Infrastructure Sync Error:", error);
+    }
+  }, [user?.token]);
 
-    readings.forEach((reading) => {
-      const day = getDayName(new Date(reading.timestamp));
-      if (dayMap[day]) {
-        dayMap[day].actual += reading.energyLoad;
-        dayMap[day].predicted += reading.energyLoad * (0.9 + Math.random() * 0.2);
-        dayMap[day].renewable += reading.energyLoad * (reading.renewablePercent / 100);
-        dayMap[day].count += 1;
+  // Data Fetching: Weekly Analytics
+  const fetchWeeklyStats = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/stats/weekly`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (!response.ok) throw new Error();
+      const data: WeeklyStat[] = await response.json();
+      setWeeklyStats(data);
+    } catch (error) {
+      console.error("Weekly Stats Sync Error:", error);
+    }
+  }, [user?.token]);
+
+  // Polling Management
+  useEffect(() => {
+    fetchStatus();
+    fetchWeeklyStats();
+    const interval = setInterval(() => {
+      fetchStatus();
+      if (systemStatus === "STREAMING") fetchWeeklyStats();
+    }, systemStatus === "STREAMING" ? 3000 : 10000);
+    return () => clearInterval(interval);
+  }, [systemStatus, fetchStatus, fetchWeeklyStats]);
+
+  // Simulation Handlers
+  const handleStartSimulation = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/simulation/start`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (response.ok) {
+        setSystemStatus("STREAMING"); 
+        toast.success("Nexus Simulation Engine Online");
+        fetchStatus();
       }
-    });
-
-    // If no readings, return baseline data
-    if (readings.length === 0) {
-      return Object.keys(dayMap).map((day) => ({
-        day,
-        actual: 0,
-        predicted: 0,
-        renewable: 0,
-      }));
+    } catch (error) {
+      toast.error("Engine start failed");
     }
+  }, [user?.token, fetchStatus]);
 
-    return Object.entries(dayMap).map(([day, data]) => ({
-      day,
-      actual: Math.round(data.count > 0 ? data.actual : 0),
-      predicted: Math.round(data.count > 0 ? data.predicted : 0),
-      renewable: Math.round(data.count > 0 ? data.renewable : 0),
-    }));
-  }, [readings]);
-
-  // Compute energy metrics from readings
-  const metrics = useMemo(() => {
-    if (readings.length === 0) {
-      return {
-        avgTemp: 0,
-        avgHumidity: 0,
-        totalEnergy: 0,
-        renewableMix: 0,
-      };
+  const handleStopSimulation = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/simulation/stop`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (response.ok) {
+        setSystemStatus("IDLE");
+        toast.info("Simulation engine halted");
+        fetchStatus();
+      }
+    } catch (error) {
+      toast.error("Emergency stop failed");
     }
+  }, [user?.token, fetchStatus]);
 
-    const totals = readings.reduce(
-      (acc, reading) => ({
-        temp: acc.temp + reading.temperature,
-        humidity: acc.humidity + reading.humidity,
-        energy: acc.energy + reading.energyLoad,
-        renewable: acc.renewable + (reading.energyLoad * reading.renewablePercent) / 100,
-      }),
-      { temp: 0, humidity: 0, energy: 0, renewable: 0 }
-    );
-
-    return {
-      avgTemp: totals.temp / readings.length,
-      avgHumidity: totals.humidity / readings.length,
-      totalEnergy: totals.energy / 1000, // Convert to MWh
-      renewableMix: (totals.renewable / totals.energy) * 100,
-    };
-  }, [readings]);
+  const handlePurgeData = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/admin/data/clear`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (response.ok) {
+        toast.success("Core database purged");
+        fetchStatus();
+        fetchWeeklyStats();
+      }
+    } catch (error) {
+      toast.error("Purge operation denied");
+    }
+  }, [user?.token, fetchStatus, fetchWeeklyStats]);
 
   const handleUploadCSV = useCallback(async (file: File) => {
+    if (!user?.token) return;
     setSystemStatus("PROCESSING");
-    await new Promise((resolve) => setTimeout(resolve, 2000));
     
-    // Add new mock readings when CSV is uploaded
-    const newReadings = Array.from({ length: 20 }, (_, i) => generateMockReading(i));
-    setReadings((prev) => [...newReadings, ...prev].slice(0, 50));
-    setTotalRecords((prev) => prev + Math.floor(Math.random() * 5000) + 1000);
-    setSystemStatus("IDLE");
-    toast.success(`Dataset "${file.name}" loaded successfully`);
-  }, []);
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const handleStartSimulation = useCallback(() => {
-    setSystemStatus("STREAMING");
-    toast.success("Simulation started - streaming live data");
-
-    const interval = setInterval(() => {
-      setReadings((prev) => {
-        const newReading = generateMockReading(0);
-        return [newReading, ...prev.slice(0, 49)];
+    try {
+      const response = await fetch(`${API_BASE}/ingest-dataset`, {
+        method: 'POST',
+        headers: { "Authorization": `Bearer ${user.token}` },
+        body: formData,
       });
-      setTotalRecords((prev) => prev + 1);
-    }, 2000);
 
-    (window as any).__simulationInterval = interval;
-  }, []);
-
-  const handleStopSimulation = useCallback(() => {
-    setSystemStatus("IDLE");
-    if ((window as any).__simulationInterval) {
-      clearInterval((window as any).__simulationInterval);
+      if (response.ok) {
+        toast.success("Dataset synchronized successfully");
+        setIsDatasetLoaded(true); 
+        await fetchStatus();
+      }
+    } catch (err) {
+      toast.error("Ingestion failed");
+    } finally {
+      setSystemStatus("IDLE");
     }
-    toast.info("Simulation stopped");
-  }, []);
-
-  const handlePurgeData = useCallback(() => {
-    if (confirm("Are you sure you want to purge all records? This action cannot be undone.")) {
-      setTotalRecords(0);
-      setReadings([]);
-      toast.success("All records purged successfully");
-    }
-  }, []);
+  }, [user?.token, fetchStatus]);
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <AdminSidebar
         systemStatus={systemStatus}
-        totalRecords={totalRecords}
+        totalRecords={report?.stats?.totalRecords || 0}
+        isDatasetLoaded={isDatasetLoaded}
         onUploadCSV={handleUploadCSV}
         onStartSimulation={handleStartSimulation}
         onStopSimulation={handleStopSimulation}
@@ -167,83 +155,82 @@ export default function AdminDashboard() {
         onOpenAccessControl={() => setIsAccessControlOpen(true)}
       />
 
-      {/* Access Control Modal */}
-      <AccessControlPanel
-        isOpen={isAccessControlOpen}
-        onClose={() => setIsAccessControlOpen(false)}
-      />
+      <AccessControlPanel isOpen={isAccessControlOpen} onClose={() => setIsAccessControlOpen(false)} />
 
-      {/* Main content - offset by sidebar width */}
       <main className="ml-[300px] pt-20 pb-8 px-6">
-        {/* Page Header */}
-        <div className="mb-8 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Command Center</h1>
-              <p className="text-muted-foreground mt-1">
-                Infrastructure monitoring and system management
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium ${
-                  systemStatus === "STREAMING"
-                    ? "bg-status-online/10 text-status-online"
-                    : systemStatus === "PROCESSING"
-                    ? "bg-status-warning/10 text-status-warning"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    systemStatus === "STREAMING"
-                      ? "bg-status-online animate-pulse"
-                      : systemStatus === "PROCESSING"
-                      ? "bg-status-warning animate-pulse"
-                      : "bg-muted-foreground"
-                  }`}
-                />
-                {systemStatus}
-              </div>
-            </div>
+        {/* Header Section */}
+        <div className="mb-8 animate-fade-in flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Command Center</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Real-time infrastructure and predictive modeling</p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-border">
+             <span className={`h-2 w-2 rounded-full ${systemStatus === 'STREAMING' ? 'bg-success animate-pulse' : 'bg-muted'}`} />
+             <span className="text-[10px] font-black uppercase tracking-widest">{systemStatus}</span>
           </div>
         </div>
 
-        {/* Energy Metrics - Only these 4 cards */}
+        {/* Top Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard
-            title="Avg Temperature"
-            value={metrics.avgTemp.toFixed(1)}
-            unit="°C"
-            icon={Thermometer}
-            trend={{ value: 2.3, isPositive: true }}
-          />
-          <MetricCard
-            title="Avg Humidity"
-            value={Math.round(metrics.avgHumidity)}
-            unit="%"
-            icon={Droplets}
-          />
-          <MetricCard
-            title="Total Energy Today"
-            value={metrics.totalEnergy.toFixed(2)}
-            unit="MWh"
-            icon={Zap}
-            trend={{ value: 5.2, isPositive: false }}
-          />
-          <MetricCard
-            title="Renewable Mix"
-            value={Math.round(metrics.renewableMix)}
-            unit="%"
-            icon={Leaf}
-            trend={{ value: 8.4, isPositive: true }}
-          />
+          <MetricCard title="Avg Temp" value={report?.stats?.averageTemperature?.toFixed(1) || "0.0"} unit="°C" icon={Thermometer} />
+          <MetricCard title="Energy Load" value={(report?.stats?.totalEnergyConsumption || 0).toFixed(1)} unit="kWh" icon={Zap} />
+          <MetricCard title="Peak Demand" value={report?.stats?.peakLoad?.toFixed(2) || "0.00"} unit="kW" icon={TrendingUp} />
+          <MetricCard title="Telemetry Rows" value={report?.stats?.totalRecords?.toLocaleString() || "0"} unit="rows" icon={Activity} />
         </div>
 
-        {/* Charts and Tables */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-          <WeeklyTrendsChart data={weeklyData} />
-          <ReadingsTable readings={readings} maxRows={6} />
+        {/* Analytics Section - Dual Chart Layout */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+          {/* Main Chart: Real-time actual vs predicted */}
+          <div className="xl:col-span-2">
+            <div className="glass-card-elevated p-6 h-[450px]">
+              <div className="flex items-center gap-2 mb-6">
+                <Activity className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-sm uppercase tracking-widest">Consumption Stream (Live vs AI)</h3>
+              </div>
+              <ConsumptionStreamChart readings={report?.recentReadings || []} />
+            </div>
+          </div>
+
+          {/* AI Digital Twin */}
+          <div className="xl:col-span-1">
+            {report?.aiInsights ? (
+              <AIDigitalTwin
+                insight={report.aiInsights.optimizationSuggestion}
+                expectedValue={report.aiInsights.expectedValue}
+                realValue={report.aiInsights.actualValue}
+                deviation={report.aiInsights.deviationPercent}
+                confidence={report.aiInsights.confidenceScore}
+                isActive={systemStatus === "STREAMING"}
+              />
+            ) : (
+              <div className="glass-card-elevated p-8 flex flex-col items-center justify-center h-full text-center border-dashed">
+                <Brain className="h-10 w-10 text-primary/20 mb-4 animate-pulse" />
+                <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter italic opacity-50">Synchronizing Predictive Engine...</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Secondary Analytics Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+           {/* Weekly Chart: Historial averages */}
+           <div className="xl:col-span-1 glass-card-elevated p-6 h-[400px]">
+              <div className="flex items-center gap-2 mb-6">
+                <Calendar className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-sm uppercase tracking-widest">Weekly Efficiency</h3>
+              </div>
+              <WeeklyEfficiencyChart data={weeklyStats} />
+           </div>
+
+           {/* Table: Latest Logs */}
+           <div className="xl:col-span-2 glass-card-elevated p-6 h-[400px]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" /> Infrastructure Logs
+                </h3>
+              </div>
+              <ReadingsTable readings={report?.recentReadings || []} maxRows={6} />
+           </div>
         </div>
       </main>
     </div>

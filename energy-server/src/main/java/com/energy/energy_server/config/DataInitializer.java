@@ -14,16 +14,28 @@ public class DataInitializer {
     @Bean
     CommandLineRunner initDatabase(UserRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
-            if (!repository.existsByEmail("admin@energy.com")) {
+            if (!repository.existsByEmail("admin@nexus.com")) {
                 
                 User admin = new User();
                 admin.setUsername("admin");
-                admin.setEmail("admin@energy.com");
+                admin.setEmail("admin@nexus.com");
                 admin.setPassword(passwordEncoder.encode("admin"));
                 admin.setRole(User.Role.ADMIN);
 
                 repository.save(admin);
-                System.out.println("✅ DEFAULT ADMIN USER CREATED: admin@energy.com / admin");
+                System.out.println("✅ DEFAULT ADMIN USER CREATED: admin@nexus.com / admin");
+            }
+
+            if (!repository.existsByEmail("user@nexus.com")) {
+                
+                User user = new User();
+                user.setUsername("user");
+                user.setEmail("user@nexus.com");
+                user.setPassword(passwordEncoder.encode("user"));
+                user.setRole(User.Role.USER);
+
+                repository.save(user);
+                System.out.println("✅ DEFAULT NON-ADMIN USER CREATED: user@nexus.com / user");
             }
         };
     }
