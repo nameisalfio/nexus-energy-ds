@@ -19,6 +19,23 @@ The platform is built around the concept of a **Digital Energy Twin**: a neural 
 
 This approach mirrors real industrial energy‑management systems used in smart buildings and Industry 4.0 environments, where predictive intelligence is used to reduce costs and improve sustainability.
 
+---
+
+## Data Science & Analytical Foundation
+
+A critical pillar of this project is the rigorous analytical foundation established prior to the implementation of the AI engine. Rather than a superficial review, a deep exploratory analysis was conducted to fully understand the dataset's underlying properties and statistical behaviors.
+
+### Exploratory Data Analysis (EDA)
+**Location:** `energy-server/dataset/python_viz/analysis.ipynb`
+
+The analysis focused on surfacing non-obvious data properties and ensuring the model's predictive validity:
+
+* **Property Discovery**: Detailed profiling of distribution shapes for environmental variables and energy metrics to detect skewness and outliers.
+* **Temporal Seasonality**: Analysis of consumption patterns across different time scales (hourly, daily, and weekly) to identify cyclical dependencies.
+* **Feature Correlation**: Deep investigation into the relationships between occupancy, HVAC status, and energy load to drive feature selection for the LSTM network.
+* **Data Preparation**: Design of normalization pipelines and cyclical time encoding (sine/cosine) based on the observed data ranges to ensure stable neural convergence.
+
+This analytical depth ensures that the resulting **Digital Twin** is grounded in the actual physical properties of the monitored infrastructure.
 
 ---
 
@@ -174,6 +191,41 @@ The findings of this notebook directly informed:
 
 The project therefore maintains **full reproducibility** between research and production.
 
+---
+
+## Security Architecture
+
+Security is treated as a first-class architectural concern across the entire distributed system. The platform adopts a stateless security model aligned with modern cloud-native and microservice-oriented best practices.
+
+### Stateless Authentication with JWT
+
+All protected endpoints are secured using **JSON Web Tokens (JWT)**. Upon successful authentication, the backend issues a signed token that encapsulates the user identity and assigned roles. Each subsequent request must present this token, allowing the system to remain fully stateless while ensuring authentication and authorization guarantees.
+
+This approach enables horizontal scalability without relying on server-side session storage.
+
+### Role-Based Access Control (RBAC)
+
+The system enforces **Role-Based Access Control (RBAC)** to clearly separate responsibilities and privileges:
+
+- **ADMIN**: Authorized to perform privileged and potentially destructive operations, including:
+  - Starting and stopping simulations
+  - Clearing telemetry data
+  - Managing users and roles
+- **USER (Observer)**: Restricted to read-only operations such as:
+  - Accessing live telemetry streams
+  - Viewing aggregated analytics and reports
+
+This separation ensures that critical system controls cannot be accessed unintentionally or maliciously.
+
+### Token Revocation Strategy
+
+Although JWT-based authentication is stateless by design, the platform mitigates replay risks through an explicit token revocation mechanism.
+
+A dedicated **BlacklistService** tracks invalidated tokens at logout time. Any incoming request presenting a blacklisted token is rejected, effectively preventing token reuse after logout and adding an additional security layer without compromising architectural statelessness.
+
+### Password Hashing and Credential Protection
+
+All sensitive credentials are protected using the **BCrypt hashing algorithm** before persistence in the MySQL datastore. BCrypt provides adaptive hashing with built-in salting, significantly increasing resistance against brute-force and rainbow table attacks. At no point are plaintext passwords stored or logged within the system.
 
 ---
 
@@ -247,6 +299,16 @@ cd energy-server
 mvn compile exec:java -Dexec.mainClass="com.energy.energy_server.ai.Train"
 ```
 
+---
+## 🛠 Testing & Integration
+
+### Postman Collection
+To facilitate rapid integration testing and API exploration, a pre-configured Postman Collection is provided in the repository root: `Nexus_Energy_API.postman_collection.json`.
+
+**Capabilities included in the collection:**
+* **Automated Auth Flow**: Scripts to automatically capture the JWT from the `/login` response and inject it into the `Authorization` header of subsequent requests.
+* **Lifecycle Testing**: Ready-to-use requests for the full system lifecycle, from user registration to simulation control and batch data ingestion.
+* **Environment Variables**: Pre-set variables for `base_url` to allow switching between local development and containerized environments.
 
 ---
 
