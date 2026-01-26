@@ -27,13 +27,13 @@ services:
     image: rabbitmq:3.12-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # Porta per l'app Java
-      - "15672:15672" # Interfaccia Web (user/pass definiti sotto)
+      - "5672:5672"   # Port for Java application
+      - "15672:15672" # Web interface (user/pass defined below)
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest} # Usa variabile o default 'guest'
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest} # Use variable or default 'guest'
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq # Persistenza code e messaggi
+      - rabbitmq_data:/var/lib/rabbitmq # Persistence for queues and messages
     networks:
       - energy-net
     healthcheck:
@@ -49,7 +49,7 @@ services:
     container_name: elasticsearch
     environment:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.ml.enabled=false            # Disabilita Machine Learning (pesante)
+      - xpack.ml.enabled=false            # Disable Machine Learning (resource-intensive)
       - xpack.security.enabled=false
       - discovery.type=single-node
     volumes:
@@ -143,7 +143,6 @@ services:
     networks:
       - energy-net
 
-# Define a custom bridge network for internal communication
 networks:
   energy-net:
     driver: bridge
