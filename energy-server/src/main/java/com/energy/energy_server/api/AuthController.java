@@ -2,6 +2,7 @@ package com.energy.energy_server.api;
 
 import java.util.List;
 
+import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -38,6 +39,7 @@ public class AuthController {
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     static class AuthRequest {
         private String email;    
         private String password;
@@ -51,6 +53,7 @@ public class AuthController {
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     static class RegisterRequest {
         private String username;
         private String password;
@@ -59,6 +62,7 @@ public class AuthController {
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     static class AuthResponse {
         private String token;
         private String username;
