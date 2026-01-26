@@ -25,4 +25,5 @@ Thumbs.db
 .env
 
 # --- Node modules ---
-./energy-client/node_modules
+node_modules/
+**/node_modules/
