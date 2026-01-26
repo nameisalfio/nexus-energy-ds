@@ -299,6 +299,14 @@ cd energy-server
 mvn compile exec:java -Dexec.mainClass="com.energy.energy_server.ai.Train"
 ```
 
+### AI Model Testing
+
+To test the LSTM model performance on a holdout set:
+```
+cd energy-server
+mvn compile exec:java -Dexec.mainClass="com.energy.energy_server.ai.EvaluateModel"
+```
+
 ---
 ## 🛠 Testing & Integration
 

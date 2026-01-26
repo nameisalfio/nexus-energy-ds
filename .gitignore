@@ -23,3 +23,6 @@ Thumbs.db
 
 # --- Environment Variables ---
 .env
+
+# --- Node.js Dependencies ---
+energy-client/node_modules/*

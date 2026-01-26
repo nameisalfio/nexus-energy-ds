@@ -1,5 +1,6 @@
 package com.energy.energy_server.service.components;
 
+import com.energy.energy_server.ai.ModelConfig;
 import com.energy.energy_server.config.RabbitMQConfig;
 import com.energy.energy_server.model.EnergyReading;
 import com.energy.energy_server.repository.EnergyReadingRepository;
@@ -39,7 +40,7 @@ public class SimulationService {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     
     private static final int FIXED_RATE_MS = 2000;
-    private static final int BURST_SIZE = 24;
+    private static final int BURST_SIZE = ModelConfig.TIME_STEPS;
     private static long entityCounter = 0L;
 
     public void loadQueue(List<EnergyReading> readings) {

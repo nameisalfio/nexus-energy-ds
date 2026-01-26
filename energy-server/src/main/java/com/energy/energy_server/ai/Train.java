@@ -7,92 +7,137 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
-import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
-import org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler;
+import org.deeplearning4j.datasets.iterator.ExistingDataSetIterator;
+import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
+import java.util.Collections;
 import org.nd4j.linalg.dataset.api.preprocessor.serializer.NormalizerSerializer;
 import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.dataset.api.preprocessor.NormalizerStandardize;
 
 public class Train {
-
     public static void main(String[] args) throws Exception {
-        // 1. READ CSV
-        File csvFile = new File(ModelConfig.CSV_PATH);
-        if (!csvFile.exists()) throw new RuntimeException("CSV not found: " + csvFile.getAbsolutePath());
-
-        List<double[]> rawData = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            String line;
-            br.readLine(); // Skip header
-            while ((line = br.readLine()) != null) {
-                String[] parts = line.split(",");
-                double temp = Double.parseDouble(parts[1]);
-                double hum = Double.parseDouble(parts[2]);
-                double occ = Double.parseDouble(parts[4]);
-                double cons = Double.parseDouble(parts[10]);
-                rawData.add(new double[]{temp, hum, occ, cons});
-            }
-        }
-        System.out.println("Data loaded: " + rawData.size());
-
-        // 2. PREPARE TENSORS (Sliding Window + Masking)
+        // 1. DATA LOADING
+        List<double[]> processedData = loadAndEngineerData(new File(ModelConfig.CSV_PATH));
+        
         int timeSteps = ModelConfig.TIME_STEPS;
-        int numSamples = rawData.size() - timeSteps; 
+        int numSamples = processedData.size() - timeSteps;
         int numFeatures = ModelConfig.INPUT_FEATURES;
 
-        INDArray features = Nd4j.create(new int[]{numSamples, numFeatures, timeSteps});
-        INDArray labels = Nd4j.create(new int[]{numSamples, 1, timeSteps});
-        INDArray labelMask = Nd4j.create(new int[]{numSamples, timeSteps});
+        INDArray features = Nd4j.create(new int[]{numSamples, numFeatures, timeSteps}, 'c');
+        INDArray labels = Nd4j.create(new int[]{numSamples, 1, timeSteps}, 'c');
+        INDArray labelMask = Nd4j.create(new int[]{numSamples, timeSteps}, 'c');
 
         for (int i = 0; i < numSamples; i++) {
             for (int t = 0; t < timeSteps; t++) {
-                double[] row = rawData.get(i + t);
-                features.putScalar(new int[]{i, 0, t}, row[0]); 
-                features.putScalar(new int[]{i, 1, t}, row[1]); 
-                features.putScalar(new int[]{i, 2, t}, row[2]); 
-                features.putScalar(new int[]{i, 3, t}, row[3]); 
+                double[] row = processedData.get(i + t);
+                for (int f = 0; f < numFeatures; f++) {
+                    features.putScalar(new int[]{i, f, t}, row[f]);
+                }
             }
-            // Target: last step
-            double target = rawData.get(i + timeSteps)[3];
+            double target = processedData.get(i + timeSteps)[6]; 
             labels.putScalar(new int[]{i, 0, timeSteps - 1}, target);
             labelMask.putScalar(new int[]{i, timeSteps - 1}, 1.0);
         }
 
         DataSet allData = new DataSet(features, labels, null, labelMask);
 
-        // 3. NORMALIZATION
-        System.out.println("Normalization...");
-        NormalizerMinMaxScaler normalizer = new NormalizerMinMaxScaler(0, 1);
-        normalizer.fitLabel(true); // Normalize the target as well to help convergence
-        normalizer.fit(allData); 
+        // 2. STANDARDIZATION
+        NormalizerStandardize normalizer = new NormalizerStandardize();
+        normalizer.fitLabel(true);
+        normalizer.fit(allData);
         normalizer.transform(allData);
-        
-        // 4. NETWORK CONFIGURATION
-        System.out.println("Configuring Network...");
+
+        // 3. MODEL INIT
         MultiLayerNetwork model = new MultiLayerNetwork(LstmArchitecture.build());
         model.init();
-        model.setListeners(new ScoreIterationListener(100)); 
-
-        // 5. TRAINING LOOP 
-        System.out.println("Starting Training (" + ModelConfig.EPOCHS + " epochs)...");
         
+        DataSetIterator iterator = new ExistingDataSetIterator(Collections.singletonList(allData));
+        double currentLr = ModelConfig.LEARNING_RATE;
+        double bestScore = Double.MAX_VALUE;
+        int patienceCounter = 0;
+
+        allData.setFeatures(allData.getFeatures().reshape(numSamples, numFeatures, timeSteps));
+        allData.setLabels(allData.getLabels().reshape(numSamples, 1, timeSteps));
+
+        System.out.println("Final Features Shape: " + java.util.Arrays.toString(allData.getFeatures().shape()));
+
+        // 4. TRAINING LOOP
+        System.out.println("Starting training on " + numSamples + " samples with batch size " + ModelConfig.BATCH_SIZE);
         for (int i = 0; i < ModelConfig.EPOCHS; i++) {
-            model.fit(allData);
-            System.out.println("Epoch " + (i+1) + " | MSELoss value: " + model.score());
+            iterator.reset(); 
+            model.fit(iterator);
+            
+            double currentScore = model.score();
+            
+            if (currentScore < bestScore) {
+                bestScore = currentScore;
+                patienceCounter = 0;
+            } else {
+                patienceCounter++;
+            }
+
+            if (patienceCounter >= 25) {
+                currentLr *= 0.5;
+                model.setLearningRate(currentLr);
+                patienceCounter = 0;
+                System.out.println("Epoch " + i + " | LR reduced to: " + currentLr);
+            }
+            
+            if (i % 50 == 0) {
+                System.out.println("Epoch " + i + " | Current Loss: " + currentScore);
+            }
         }
-
-        // 6. SAVING
-        System.out.println("Saving...");
-        File modelFile = new File(ModelConfig.MODEL_EXPORT_PATH);
-        File normFile = new File(ModelConfig.NORMALIZER_EXPORT_PATH);
         
-        if (modelFile.getParentFile() != null) modelFile.getParentFile().mkdirs();
+        // 5. EXPORT
+        ModelSerializer.writeModel(model, ModelConfig.MODEL_EXPORT_PATH, true);
+        NormalizerSerializer.getDefault().write(normalizer, ModelConfig.NORMALIZER_EXPORT_PATH);
+        System.out.println("Model and Normalizer saved successfully.");
+    }
 
-        ModelSerializer.writeModel(model, modelFile, true);
-        NormalizerSerializer.getDefault().write(normalizer, normFile);
+    public static List<double[]> loadAndEngineerData(File file) throws Exception {
+        List<double[]> list = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line = br.readLine(); // skip header
+            Double lastConsumption = null;
+            
+            while ((line = br.readLine()) != null) {
+                String[] p = line.split(",");
+                if (p.length < 11) continue; // Skip malformed lines
 
-        System.out.println("=== Training Complete ===");
+                try {
+                    double temp = Double.parseDouble(p[1]);
+                    double occ = Double.parseDouble(p[4]);
+                    double hvac = p[6].trim().equalsIgnoreCase("On") ? 1.0 : 0.0;
+                    double consumption = Double.parseDouble(p[10]);
+                    
+                    // Robust Hour extraction
+                    int hour = extractHour(p[0]);
+                    double hSin = Math.sin(2 * Math.PI * hour / 24.0);
+                    double hCos = Math.cos(2 * Math.PI * hour / 24.0);
+                    
+                    double lag1h = (lastConsumption == null) ? consumption : lastConsumption;
+                    lastConsumption = consumption;
+
+                    // Row structure: 6 features + 1 target = 7 elements
+                    list.add(new double[]{temp, occ, hvac, lag1h, hSin, hCos, consumption});
+                } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+                    // Skip lines with parsing errors
+                }
+            }
+        }
+        return list;
+    }
+
+    private static int extractHour(String timestamp) {
+        try {
+            // Handles "2024-01-01 15:00:00" or "15:00:00"
+            String timePart = timestamp.contains(" ") ? timestamp.split(" ")[1] : timestamp;
+            return Integer.parseInt(timePart.split(":")[0]);
+        } catch (Exception e) {
+            return 0; // Default fallback
+        }
     }
 }
