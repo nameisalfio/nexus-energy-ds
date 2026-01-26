@@ -55,12 +55,15 @@ export default function AdminDashboard() {
   // Polling Management
   useEffect(() => {
     fetchStatus();
-    fetchWeeklyStats();
-    const interval = setInterval(() => {
-      fetchStatus();
-      if (systemStatus === "STREAMING") fetchWeeklyStats();
-    }, systemStatus === "STREAMING" ? 3000 : 10000);
-    return () => clearInterval(interval);
+    if (systemStatus === "STREAMING") {
+      const interval = setInterval(() => {
+        fetchStatus();
+        fetchWeeklyStats();
+      }, 3000); 
+      return () => clearInterval(interval);
+    } else {
+      fetchWeeklyStats();
+    }
   }, [systemStatus, fetchStatus, fetchWeeklyStats]);
 
   // Simulation Handlers

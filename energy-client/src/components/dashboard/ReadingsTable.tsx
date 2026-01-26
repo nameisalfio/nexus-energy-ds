@@ -53,10 +53,10 @@ export function ReadingsTable({ readings = [], maxRows = 10 }: { readings: Readi
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn(
-                    "text-[10px] font-black px-2 py-0.5 rounded-md border",
-                    reading.lightingUsage === "ON" ? "bg-yellow-400/10 text-yellow-500 border-yellow-500/20" : "bg-muted text-muted-foreground border-transparent"
+                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter",
+                    reading.lightingUsage === "On" ? "bg-status-online/10 text-status-online" : "bg-muted text-muted-foreground"
                   )}>
-                    {reading.lightingUsage || "OFF"}
+                    {reading.lightingUsage || "Off"}
                   </span>
                 </td>
                 <td className="px-4 py-3">

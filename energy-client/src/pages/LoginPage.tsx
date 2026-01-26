@@ -157,7 +157,7 @@ export default function LoginPage() {
               >
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                   <>
-                    {mode === "login" ? "Sign In" : "Register on DB"}
+                    {mode === "login" ? "Sign In" : "Register me"}
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
