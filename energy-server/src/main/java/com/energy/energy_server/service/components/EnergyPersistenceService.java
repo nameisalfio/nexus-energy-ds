@@ -10,6 +10,8 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,20 +26,50 @@ public class EnergyPersistenceService {
 
     public final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private static long entityCounter = 0L;
+    private static final int ALERT_THRESHOLD = 25;
 
     @CircuitBreaker(name = "energyDbBreaker", fallbackMethod = "fallbackSave")
     public void saveReading(EnergyReading entity) {
         ensureCorrelationId(entity);
+
+        if (entity.getTimestamp() == null) {
+            entity.setTimestamp(LocalDateTime.now());
+        }
+
+
         energyRepository.saveAndFlush(entity);
         entityCounter++;
         auditService.incrementDirect();
+
+        log.info("💾 DB_SAVE | ID: {} | Timestamp: {} | Temp: {}°C | Humidity: {}% | Energy: {} kWh",
+                entity.getCorrelationId(),
+                entity.getTimestamp(),
+                entity.getTemperature(),
+                entity.getHumidity(),
+                entity.getEnergyConsumption());
+
+        // Reset failures counter
+        if (consecutiveFailures.get() > 0) {
+            log.info("✅ DATABASE_RECOVERED | Previous failures: {}", consecutiveFailures.get());
+            consecutiveFailures.set(0);
+        }
     }
 
     public void fallbackSave(EnergyReading entity, Throwable t) {
-        log.error("DB_STRESS | Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
-        consecutiveFailures.incrementAndGet();
+        int currentFailures = consecutiveFailures.incrementAndGet();
+
+        if (currentFailures == 1) {
+            log.error("DB_STRESS | First failure detected | Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
+        } else if (currentFailures % ALERT_THRESHOLD == 0) {
+            log.error("DB_STRESS | Failures: {} | Action: Fallback to RabbitMQ | Error: {}\", t.getMessage()", currentFailures, t.getMessage());
+        } else {
+            log.debug("DB_FALLBACK| Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
+
+        }
+
         ensureCorrelationId(entity);
         sendToRabbitMQ(entity);
+
     }
 
     @CircuitBreaker(name = "energyDbBreaker", fallbackMethod = "fallbackCount")
@@ -57,13 +89,33 @@ public class EnergyPersistenceService {
 
     private void sendToRabbitMQ(EnergyReading entity) {
         try {
-            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY, entity, m -> {
-                m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-                return m;
-            });
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE_NAME,
+                    RabbitMQConfig.ROUTING_KEY,
+                    entity,
+                    message -> {
+                        message.getMessageProperties().setMessageId(entity.getCorrelationId());
+                        message.getMessageProperties().setTimestamp(new Date());
+                        message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                        message.getMessageProperties().setHeader("source", "circuit-breaker-fallback");
+                        message.getMessageProperties().setHeader("failureCount", consecutiveFailures.get());
+                        return message;
+                    });
+
             auditService.incrementSent();
+
+            log.info("📨 RABBITMQ_SEND | ID: {} | Timestamp: {} | Temp: {}°C | Humidity: {}% | Energy: {} kWh | Failures: {}",
+                    entity.getCorrelationId(),
+                    entity.getTimestamp(),
+                    entity.getTemperature(),
+                    entity.getHumidity(),
+                    entity.getEnergyConsumption(),
+                    consecutiveFailures.get());
+
         } catch (Exception e) {
-            log.error("RABBIT_FAILURE | Data risk!");
+            log.error("❌ RABBITMQ_UNREACHABLE | CRITICAL DATA LOSS RISK | ID: {} | Error: {}",
+                    entity.getCorrelationId(),
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 }
