@@ -43,9 +43,16 @@ public class SimulationService {
     public void start() {
         if (!ingestionQueue.isEmpty()) {
             isRunning.set(true);
-            log.info("NEXUS_SIM | Engine STARTED - Executing initial 24 record burst");
-            for (int i = 0; i < BURST_SIZE && !ingestionQueue.isEmpty(); i++) {
-                processSingleStep();
+
+            long existingRecords = energyPersistenceService.getRecordCount();
+
+            if (existingRecords == 0) {
+                log.info("NEXUS_SIM | Database empty (0 records). Executing warm-up burst.");
+                for (int i = 0; i < BURST_SIZE && !ingestionQueue.isEmpty(); i++) {
+                    processSingleStep();
+                }
+            } else {
+                log.info("NEXUS_SIM | Database warm ({} records). Skipping burst, entering interval mode.", existingRecords);
             }
 
             log.info("NEXUS_SIM | Burst complete. Interval mode engaged.");
