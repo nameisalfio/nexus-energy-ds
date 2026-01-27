@@ -58,19 +58,19 @@ public class RecoveryService {
                     energyReading.getEnergyConsumption());
 
         } catch (CannotGetJdbcConnectionException e) {
-            log.error("RECOVERY_FAILED | ID: {} | Reason: DB_UNREACHABLE | Action: Requeued", messageId);
+            log.error("RECOVERY_FAILED, DB_STRESS | ID: {} | Reason: DB_UNREACHABLE | Action: Requeued", messageId);
             throw e;
 
         } catch (QueryTimeoutException e) {
-            log.error("RECOVERY_FAILED | ID: {} | Reason: DB_TIMEOUT | Action: Requeued", messageId);
+            log.error("RECOVERY_FAILED, DB_STRESS | ID: {} | Reason: DB_TIMEOUT | Action: Requeued", messageId);
             throw e;
 
         } catch (JDBCConnectionException e) {
-            log.error("RECOVERY_FAILED | ID: {} | Reason: JDBC_CONNECTION | Action: Requeued", messageId);
+            log.error("RECOVERY_FAILED, DB_STRESS | ID: {} | Reason: JDBC_CONNECTION | Action: Requeued", messageId);
             throw e;
 
         } catch (DataAccessException e) {
-            log.error("RECOVERY_FAILED | ID: {} | Reason: DB_ERROR | Error: {} | Action: Requeued",
+            log.error("RECOVERY_FAILED, DB_STRESS | ID: {} | Reason: DB_ERROR | Error: {} | Action: Requeued",
                     messageId, e.getClass().getSimpleName());
             throw e;
 

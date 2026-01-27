@@ -9,6 +9,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
 import org.nd4j.linalg.dataset.api.preprocessor.serializer.NormalizerSerializer;
 import org.nd4j.linalg.factory.Nd4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import com.energy.energy_server.ai.ModelConfig;
@@ -26,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AiModelServiceImpl implements AiModelService {
 
     private static final double ANOMALY_THRESHOLD = 0.2; // 20% allowed deviation
-    private static final String MSG_ANOMALY = "Anomaly detected: consumption deviates from expected pattern.";
+    private static final String MSG_ANOMALY = "ANOMALY_ALERT: Anomaly detected: consumption deviates from expected pattern.";
     private static final String MSG_NORMAL = "System operating within normal parameters.";
 
     private final EnergyReadingRepository energyReadingRepository;
@@ -68,6 +69,26 @@ public class AiModelServiceImpl implements AiModelService {
         
         double deviation = predicted > 0 ? ((actual - predicted) / predicted) * 100 : 0.0;
         boolean anomaly = Math.abs(deviation) > (ANOMALY_THRESHOLD * 100);
+
+        // Anomaly message
+        if (anomaly) {
+            try {
+                MDC.put("event_type", "ANOMALY");
+                MDC.put("anomaly_deviation", String.format("%.2f", deviation));
+                MDC.put("anomaly_predicted", String.format("%.2f", predicted));
+                MDC.put("anomaly_actual", String.format("%.2f", actual));
+
+                log.warn("{} | Predicted: {} | Actual: {} | Deviation: {}%",
+                        MSG_ANOMALY,
+                        String.format("%.2f", predicted),
+                        String.format("%.2f", actual),
+                        String.format("%.2f", deviation));
+            } finally {
+                MDC.clear();
+            }
+        } else {
+            log.info("{} | Deviation: {}%", MSG_NORMAL, String.format("%.2f", deviation));
+        }
     
         String suggestion = generateSmartSuggestion(reading, actual, predicted, deviation);
     

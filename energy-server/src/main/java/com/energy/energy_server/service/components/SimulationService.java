@@ -99,6 +99,9 @@ public class SimulationService {
     }
 
     public void fallbackSave(EnergyReading entity, Throwable t) {
+
+        log.error("DB_STRESS | Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
+
         consecutiveFailures.incrementAndGet();
         ensureCorrelationId(entity);
         sendToRabbitMQ(entity);
