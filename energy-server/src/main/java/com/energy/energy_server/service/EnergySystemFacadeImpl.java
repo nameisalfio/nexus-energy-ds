@@ -21,13 +21,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class EnergySystemFacadeImpl implements EnergySystemFacade{
+public class EnergySystemFacadeImpl implements EnergySystemFacade {
 
     private final IngestionService ingestionService;
     private final SimulationService simulationService;
     private final AnalyticsService analyticsService;
     private final AiModelService aiModelService;
     private final EnergyReadingRepository energyReadingRepository;
+
+    private volatile SystemReportDTO lastSnapshot;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
@@ -37,6 +39,7 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
         log.info("NEXUS_CORE | System Startup: Purging old telemetry");
         energyReadingRepository.deleteAllInBatch();
         analyticsService.clearHistory();
+        this.lastSnapshot = new SystemReportDTO(new SystemReportDTO.StatsDTO(0, 0, 0, 0), null, List.of());
     }
 
     @Override
@@ -49,28 +52,38 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
     }
 
     @Override
-    public void startSimulation() { 
-        simulationService.start(); 
+    public void startSimulation() {
+        simulationService.start();
     }
 
     @Override
-    public void stopSimulation() { 
-        simulationService.stop(); 
+    public void stopSimulation() {
+        simulationService.stop();
     }
 
     @EventListener
     @Override
     public void onTelemetryUpdate(EnergyReading reading) {
-        AiInsightDTO insights = getAiInsightsSafe(reading);
-        SystemReportDTO report = analyticsService.generateReport(reading, insights);
-        broadcast(report);
+
+        try {
+            // Process AI insights (Digital Twin comparison)
+            AiInsightDTO insights = getAiInsightsSafe(reading);
+
+            // Prepare the comprehensive status report
+            SystemReportDTO report = analyticsService.generateReport(reading, insights);
+            this.lastSnapshot = report;
+
+            // Push data to active dashboard subscribers
+            broadcast(report);
+
+        } catch (Exception e) {
+            log.error("NEXUS_CORE | Failed to process telemetry update: {}", e.getMessage());
+        }
     }
 
     @Override
     public SystemReportDTO getCurrentStatus() {
-        EnergyReading latest = analyticsService.getLatestReading();
-        AiInsightDTO insights = getAiInsightsSafe(latest);
-        return analyticsService.generateReport(latest, insights);
+        return this.lastSnapshot;
     }
 
     @Override
@@ -117,14 +130,9 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
         log.warn("NEXUS_CORE | Full purge executed manually");
     }
 
-    @EventListener
-    public void handleTelemetryEvent(EnergyReading reading) {
-        try {
-            AiInsightDTO insights = getAiInsightsSafe(reading);
-            SystemReportDTO report = analyticsService.generateReport(reading, insights);
-            broadcast(report);
-        } catch (Exception e) {
-            log.error("Error during real-time broadcast", e);
-        }
+    @Override
+    public boolean isSimulationRunning() {
+        return simulationService.getIsRunning().get();
     }
+
 }

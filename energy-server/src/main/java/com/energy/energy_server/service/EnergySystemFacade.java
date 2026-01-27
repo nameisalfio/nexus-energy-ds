@@ -26,4 +26,6 @@ public interface EnergySystemFacade {
     void clearAllData();
 
     void onTelemetryUpdate(EnergyReading reading);
+
+    boolean isSimulationRunning();
 }
