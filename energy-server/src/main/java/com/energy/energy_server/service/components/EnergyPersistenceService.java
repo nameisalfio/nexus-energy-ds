@@ -59,12 +59,13 @@ public class EnergyPersistenceService {
         int currentFailures = consecutiveFailures.incrementAndGet();
 
         if (currentFailures == 1) {
-            log.error("DB_STRESS | First failure detected | Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
+            log.error("DB_STRESS | Initial database failure | ID: {} | Error: {}",
+                    entity.getCorrelationId(), t.getMessage());
         } else if (currentFailures % ALERT_THRESHOLD == 0) {
-            log.error("DB_STRESS | Failures: {} | Action: Fallback to RabbitMQ | Error: {}\", t.getMessage()", currentFailures, t.getMessage());
+            log.error("DB_STRESS | Cumulative failures: {} | ID: {} | Error: {}",
+                    currentFailures, entity.getCorrelationId(), t.getMessage());
         } else {
-            log.debug("DB_FALLBACK| Database Unreachable | Action: Fallback to RabbitMQ | Error: {}", t.getMessage());
-
+            log.debug("DB_FALLBACK | Rerouting to RabbitMQ...");
         }
 
         ensureCorrelationId(entity);
