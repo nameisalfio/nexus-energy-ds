@@ -53,7 +53,7 @@ public class AnalyticsService {
             (long) recent.size()
         );
 
-        return new SystemReportDTO(stats, insights, recent);
+        return new SystemReportDTO(stats, aiInsights, recent);
     }
 
     public List<WeeklyStatsDTO> getWeeklyStats() {
