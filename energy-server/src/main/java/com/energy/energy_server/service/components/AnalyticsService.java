@@ -23,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 public class AnalyticsService {
 
     private final EnergyReadingRepository energyReadingRepository;
-    private final AiModelService aiModelService;
 
     public void clearHistory() {
         log.info("Analytics history cleared");
@@ -35,13 +34,12 @@ public class AnalyticsService {
                 .orElse(new EnergyReading());
     }
 
-    public SystemReportDTO generateReport(EnergyReading latest) {
-        AiInsightDTO defaultInsight = new AiInsightDTO(false, 0.0, 0.0, 0.0, "AI Initializing...");
+    public SystemReportDTO generateReport(EnergyReading latest, AiInsightDTO aiInsights) {
 
-        AiInsightDTO insights = (aiModelService != null && latest.getId() != null) 
-            ? aiModelService.analyze(latest) 
-            : defaultInsight;
-        
+        if (aiInsights== null) {
+            aiInsights= new AiInsightDTO(false, 0.0, 0.0, 0.0, "AI Unavailable");
+        }
+
         List<EnergyReading> recent = energyReadingRepository.findTop100ByOrderByTimestampDesc();
         
         double avgTemp = recent.stream().mapToDouble(r -> r.getTemperature() != null ? r.getTemperature() : 0.0).average().orElse(0.0);

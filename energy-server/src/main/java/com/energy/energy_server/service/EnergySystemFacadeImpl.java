@@ -1,5 +1,6 @@
 package com.energy.energy_server.service;
 
+import com.energy.energy_server.dto.AiInsightDTO;
 import com.energy.energy_server.dto.SystemReportDTO;
 import com.energy.energy_server.dto.WeeklyStatsDTO;
 import com.energy.energy_server.model.EnergyReading;
@@ -25,6 +26,7 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
     private final IngestionService ingestionService;
     private final SimulationService simulationService;
     private final AnalyticsService analyticsService;
+    private final AiModelService aiModelService;
     private final EnergyReadingRepository energyReadingRepository;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
@@ -59,13 +61,16 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
     @EventListener
     @Override
     public void onTelemetryUpdate(EnergyReading reading) {
-        SystemReportDTO report = analyticsService.generateReport(reading);
+        AiInsightDTO insights = getAiInsightsSafe(reading);
+        SystemReportDTO report = analyticsService.generateReport(reading, insights);
         broadcast(report);
     }
 
     @Override
     public SystemReportDTO getCurrentStatus() {
-        return analyticsService.generateReport(analyticsService.getLatestReading());
+        EnergyReading latest = analyticsService.getLatestReading();
+        AiInsightDTO insights = getAiInsightsSafe(latest);
+        return analyticsService.generateReport(latest, insights);
     }
 
     @Override
@@ -92,6 +97,18 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
         }
     }
 
+    private AiInsightDTO getAiInsightsSafe(EnergyReading reading) {
+        if (reading == null || reading.getId() == null) {
+            return new AiInsightDTO(false, 0.0, 0.0, 0.0, "Waiting for data...");
+        }
+        try {
+            return aiModelService.analyze(reading);
+        } catch (Exception e) {
+            log.warn("AI Analysis unavailable: {}", e.getMessage());
+            return new AiInsightDTO(false, 0.0, 0.0, 0.0, "AI Module Offline");
+        }
+    }
+
     @Override
     public void clearAllData() {
         simulationService.stop();
@@ -103,7 +120,8 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade{
     @EventListener
     public void handleTelemetryEvent(EnergyReading reading) {
         try {
-            SystemReportDTO report = analyticsService.generateReport(reading);
+            AiInsightDTO insights = getAiInsightsSafe(reading);
+            SystemReportDTO report = analyticsService.generateReport(reading, insights);
             broadcast(report);
         } catch (Exception e) {
             log.error("Error during real-time broadcast", e);
