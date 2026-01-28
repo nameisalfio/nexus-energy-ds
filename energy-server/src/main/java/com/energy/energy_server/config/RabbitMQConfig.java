@@ -41,11 +41,9 @@ public class RabbitMQConfig {
                 .withArgument("x-queue-type", "quorum")
                 // TTL 7 days = 604800000ms
                 .withArgument("x-message-ttl", 604800000)
-                // RIMOSSO x-max-length per evitare scarto messaggi
-                // RIMOSSO x-overflow per non rifiutare publish
                 .withArgument("x-dead-letter-exchange", "")
                 .withArgument("x-dead-letter-routing-key", DLQ_NAME)
-                // Delivery limit: dopo 1000 tentativi falliti, va in DLQ
+                // Delivery limit -> DLQ
                 .withArgument("x-delivery-limit", 1000)
                 .build();
     }
@@ -54,7 +52,6 @@ public class RabbitMQConfig {
     public Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_NAME)
                 .withArgument("x-queue-type", "quorum")
-                // Nessun TTL sulla DLQ - i messaggi restano per sempre
                 .build();
     }
 
@@ -120,7 +117,6 @@ public class RabbitMQConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(jsonMessageConverter);
 
-        // Publisher Confirms: callback quando RabbitMQ conferma ricezione
         template.setConfirmCallback((correlationData, ack, cause) -> {
             if (ack) {
                 log.debug("Message confirmed by RabbitMQ: {}", correlationData);
@@ -130,7 +126,6 @@ public class RabbitMQConfig {
             }
         });
 
-        // Return Callback: chiamato se il messaggio non può essere routato
         template.setReturnsCallback(returned -> {
             log.error("CRITICAL: Message returned (unroutable)! " +
                             "Exchange: {}, RoutingKey: {}, ReplyText: {}, Message: {}",
