@@ -37,12 +37,6 @@ public class RabbitMQConfig {
         return mapper;
     }
 
-    /**
-     * FIX #1: Coda principale con retry infinito e TTL lungo
-     * - Quorum queue per alta affidabilità
-     * - TTL di 7 giorni (invece di 1)
-     * - Nessun limite di lunghezza per evitare perdite
-     */
     @Bean
     public Queue fallbackQueue() {
         return QueueBuilder.durable(QUEUE_NAME)
@@ -65,9 +59,6 @@ public class RabbitMQConfig {
                 .build();
     }
 
-    /**
-     * FIX #2: DLQ con retention infinito per analisi post-mortem
-     */
     @Bean
     public Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_NAME)
@@ -135,10 +126,6 @@ public class RabbitMQConfig {
         };
     }
 
-    /**
-     * FIX #3: RabbitTemplate con Publisher Confirms
-     * Garantisce che ogni messaggio sia effettivamente arrivato a RabbitMQ
-     */
     @Bean
     public RabbitTemplate rabbitTemplate(
             ConnectionFactory connectionFactory,
@@ -154,7 +141,6 @@ public class RabbitMQConfig {
             } else {
                 log.error("CRITICAL: Message rejected by RabbitMQ! CorrelationData: {}, Cause: {}",
                         correlationData, cause);
-                // TODO: Implementare retry o fallback locale
             }
         });
 
@@ -166,7 +152,6 @@ public class RabbitMQConfig {
                     returned.getRoutingKey(),
                     returned.getReplyText(),
                     returned.getMessage());
-            // TODO: Implementare retry o fallback locale se serve
         });
 
         return template;
