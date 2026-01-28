@@ -6,6 +6,7 @@ import com.energy.energy_server.repository.EnergyReadingRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -58,7 +59,10 @@ public class EnergyPersistenceService {
     public void fallbackSave(EnergyReading entity, Throwable t) {
         int currentFailures = consecutiveFailures.incrementAndGet();
 
+        MDC.put("message", t.getMessage());
+
         if (currentFailures == 1) {
+
             log.error("DB_STRESS | Initial database failure | ID: {} | Error: {}",
                     entity.getCorrelationId(), t.getMessage());
         } else if (currentFailures % ALERT_THRESHOLD == 0) {
