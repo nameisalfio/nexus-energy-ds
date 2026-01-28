@@ -57,19 +57,28 @@ public class EnergyPersistenceService {
     }
 
     public void fallbackSave(EnergyReading entity, Throwable t) {
+
         int currentFailures = consecutiveFailures.incrementAndGet();
 
-        MDC.put("message", t.getMessage());
+        try {
 
-        if (currentFailures == 1) {
+            MDC.put("db_error_detail", t.getMessage());
 
-            log.error("DB_STRESS | Initial database failure | ID: {} | Error: {}",
-                    entity.getCorrelationId(), t.getMessage());
-        } else if (currentFailures % ALERT_THRESHOLD == 0) {
-            log.error("DB_STRESS | Cumulative failures: {} | ID: {} | Error: {}",
-                    currentFailures, entity.getCorrelationId(), t.getMessage());
-        } else {
-            log.debug("DB_FALLBACK | Rerouting to RabbitMQ...");
+            if (currentFailures == 1) {
+                log.error("DB_STRESS | Initial database failure | ID: {} | Error: {}",
+                        entity.getCorrelationId(), t.getMessage());
+            } else if (currentFailures % ALERT_THRESHOLD == 0) {
+                log.error("DB_STRESS | Cumulative failures: {} | ID: {} | Error: {}",
+                        currentFailures, entity.getCorrelationId(), t.getMessage());
+            } else {
+                log.debug("DB_FALLBACK | Rerouting to RabbitMQ...");
+            }
+
+            ensureCorrelationId(entity);
+            sendToRabbitMQ(entity);
+
+        } finally {
+            MDC.remove("db_error_detail");
         }
 
         ensureCorrelationId(entity);
