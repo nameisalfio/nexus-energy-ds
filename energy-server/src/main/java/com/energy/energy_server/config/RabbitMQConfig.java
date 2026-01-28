@@ -24,8 +24,6 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_NAME = "energy_exchange";
     public static final String QUEUE_NAME = "energy_fallback_queue";
     public static final String ROUTING_KEY = "energy.reading.save";
-    public static final String ANOMALY_QUEUE = "energy_anomaly_queue";
-    public static final String ANOMALY_ROUTING_KEY = "energy.anomaly.#";
     public static final String DLQ_NAME = QUEUE_NAME + ".dlq";
 
     @Bean
@@ -37,17 +35,11 @@ public class RabbitMQConfig {
         return mapper;
     }
 
-    /**
-     * FIX #1: Coda principale con retry infinito e TTL lungo
-     * - Quorum queue per alta affidabilità
-     * - TTL di 7 giorni (invece di 1)
-     * - Nessun limite di lunghezza per evitare perdite
-     */
     @Bean
     public Queue fallbackQueue() {
         return QueueBuilder.durable(QUEUE_NAME)
                 .withArgument("x-queue-type", "quorum")
-                // TTL 7 giorni = 604800000ms
+                // TTL 7 days = 604800000ms
                 .withArgument("x-message-ttl", 604800000)
                 // RIMOSSO x-max-length per evitare scarto messaggi
                 // RIMOSSO x-overflow per non rifiutare publish
@@ -58,16 +50,6 @@ public class RabbitMQConfig {
                 .build();
     }
 
-    @Bean
-    public Queue anomalyQueue() {
-        return QueueBuilder.durable(ANOMALY_QUEUE)
-                .withArgument("x-queue-type", "quorum")
-                .build();
-    }
-
-    /**
-     * FIX #2: DLQ con retention infinito per analisi post-mortem
-     */
     @Bean
     public Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_NAME)
@@ -84,11 +66,6 @@ public class RabbitMQConfig {
     @Bean
     public Binding binding(Queue fallbackQueue, TopicExchange exchange) {
         return BindingBuilder.bind(fallbackQueue).to(exchange).with(ROUTING_KEY);
-    }
-
-    @Bean
-    public Binding anomalyBinding(Queue anomalyQueue, TopicExchange exchange) {
-        return BindingBuilder.bind(anomalyQueue).to(exchange).with(ANOMALY_ROUTING_KEY);
     }
 
     @Bean
@@ -135,10 +112,6 @@ public class RabbitMQConfig {
         };
     }
 
-    /**
-     * FIX #3: RabbitTemplate con Publisher Confirms
-     * Garantisce che ogni messaggio sia effettivamente arrivato a RabbitMQ
-     */
     @Bean
     public RabbitTemplate rabbitTemplate(
             ConnectionFactory connectionFactory,
@@ -154,7 +127,6 @@ public class RabbitMQConfig {
             } else {
                 log.error("CRITICAL: Message rejected by RabbitMQ! CorrelationData: {}, Cause: {}",
                         correlationData, cause);
-                // TODO: Implementare retry o fallback locale
             }
         });
 
@@ -166,7 +138,6 @@ public class RabbitMQConfig {
                     returned.getRoutingKey(),
                     returned.getReplyText(),
                     returned.getMessage());
-            // TODO: Implementare retry o fallback locale se serve
         });
 
         return template;

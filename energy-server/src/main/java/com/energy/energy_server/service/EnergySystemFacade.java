@@ -3,104 +3,29 @@ package com.energy.energy_server.service;
 import com.energy.energy_server.dto.SystemReportDTO;
 import com.energy.energy_server.dto.WeeklyStatsDTO;
 import com.energy.energy_server.model.EnergyReading;
-import com.energy.energy_server.repository.EnergyReadingRepository;
-import com.energy.energy_server.service.components.AnalyticsService;
-import com.energy.energy_server.service.components.IngestionService;
-import com.energy.energy_server.service.components.SimulationService;
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class EnergySystemFacade {
+public interface EnergySystemFacade {
 
-    private final IngestionService ingestionService;
-    private final SimulationService simulationService;
-    private final AnalyticsService analyticsService;
-    private final EnergyReadingRepository energyReadingRepository;
+    void handleDatasetUpload(MultipartFile file) throws IOException;
 
-    private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    void startSimulation();
 
+    void stopSimulation();
 
-    @PostConstruct
-    public void init() {
-        log.info("NEXUS_CORE | System Startup: Purging old telemetry");
-        energyReadingRepository.deleteAllInBatch();
-        analyticsService.clearHistory();
-    }
+    SystemReportDTO getCurrentStatus();
 
-    public void handleDatasetUpload(MultipartFile file) throws IOException {
-        try {
-            ingestionService.handleUpload(file);
-        } catch (Exception e) {
-            throw new IOException("Dataset ingestion rejected", e);
-        }
-    }
+    List<WeeklyStatsDTO> getWeeklyTrends();
 
-    public void startSimulation() { 
-        simulationService.start(); 
-    }
+    SseEmitter subscribe();
 
-    public void stopSimulation() { 
-        simulationService.stop(); 
-    }
+    void clearAllData();
 
-    @EventListener
-    public void onTelemetryUpdate(EnergyReading reading) {
-        SystemReportDTO report = analyticsService.generateReport(reading);
-        broadcast(report);
-    }
+    void onTelemetryUpdate(EnergyReading reading);
 
-    public SystemReportDTO getCurrentStatus() {
-        return analyticsService.generateReport(analyticsService.getLatestReading());
-    }
-
-    public List<WeeklyStatsDTO> getWeeklyTrends() {
-        return analyticsService.getWeeklyStats();
-    }
-
-    public SseEmitter subscribe() {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitters.add(emitter);
-        return emitter;
-    }
-
-    private void broadcast(SystemReportDTO payload) {
-        for (SseEmitter emitter : emitters) {
-            try {
-                emitter.send(SseEmitter.event().name("update").data(payload));
-            } catch (Exception e) {
-                emitters.remove(emitter);
-            }
-        }
-    }
-
-    public void clearAllData() {
-        simulationService.stop();
-        energyReadingRepository.deleteAllInBatch();
-        analyticsService.clearHistory();
-        log.warn("NEXUS_CORE | Full purge executed manually");
-    }
-
-    @EventListener
-    public void handleTelemetryEvent(EnergyReading reading) {
-        try {
-            SystemReportDTO report = analyticsService.generateReport(reading);
-            broadcast(report);
-        } catch (Exception e) {
-            log.error("Error during real-time broadcast", e);
-        }
-    }
+    boolean isSimulationRunning();
 }

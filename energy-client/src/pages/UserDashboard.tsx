@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { Thermometer, Zap, Activity, TrendingUp, BarChart3, Download, Search, Filter, ChevronRight, RotateCcw } from "lucide-react";
+import {
+  Thermometer, Zap, Activity, TrendingUp,
+  Download, Search, Filter, ChevronRight, RotateCcw
+} from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ReadingsTable } from "@/components/dashboard/ReadingsTable";
@@ -16,24 +19,14 @@ export default function UserDashboard() {
   const [report, setReport] = useState<SystemReport | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus>("IDLE");
-  
+
   // Advanced Filtering States
   const [searchQuery, setSearchQuery] = useState("");
   const [activeAttr, setActiveAttr] = useState<keyof Reading | null>(null);
   const [filterValue, setFilterValue] = useState<any>("All");
   const [rangeValue, setRangeValue] = useState<[number, number]>([0, 200]);
-  
-  const scrollPos = useRef(0);
+
   const hasData = report?.stats && report.stats.totalRecords > 0;
-
-  // Persistence of scroll position during re-renders
-  useEffect(() => {
-    window.scrollTo(0, scrollPos.current);
-  });
-
-  const saveScroll = () => {
-    scrollPos.current = window.scrollY;
-  };
 
   // Logic to identify if an attribute is numeric for Slider UI
   const isNumeric = (attr: keyof Reading | null) => {
@@ -53,20 +46,72 @@ export default function UserDashboard() {
     occupancy: "OCC."
   };
 
-  // Extract unique values for categorical attributes
+  // Data Fetching: Infrastructure & Engine State
+  const fetchAllData = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      // Sync engine status
+      const stateRes = await fetch(`${API_BASE}/simulation/state`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (stateRes.ok) {
+        const state = await stateRes.text();
+        setSystemStatus(state as SystemStatus);
+      }
+
+      // Fetch latest report
+      const reportRes = await fetch(`${API_BASE}/full-report`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      const data = await reportRes.json();
+      setReport(data);
+
+      // Fetch weekly trends
+      const statsRes = await fetch(`${API_BASE}/stats/weekly`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      const statsData = await statsRes.json();
+      setWeeklyStats(statsData);
+    } catch (error) {
+      console.error("Dashboard sync error:", error);
+    }
+  }, [user?.token]);
+
+  // Real-time Stream Management (SSE)
+  useEffect(() => {
+    if (!user?.token) return;
+
+    fetchAllData();
+
+    const eventSource = new EventSource(`${API_BASE}/stream`);
+
+    eventSource.addEventListener("update", (event) => {
+      const newReport = JSON.parse(event.data);
+      setReport(newReport);
+      setSystemStatus("STREAMING");
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  }, [user?.token, fetchAllData]);
+
+  // Unique values for filters
   const uniqueValues = useMemo(() => {
     if (!report?.recentReadings || !activeAttr || isNumeric(activeAttr)) return [];
     const values = report.recentReadings.map((r: any) => String(r[activeAttr]));
     return ["All", ...Array.from(new Set(values))];
   }, [report, activeAttr]);
 
-  // Unified Filtering Logic: Search + Nested Attributes + Sliders
+  // Filtering Logic
   const filteredReadings = useMemo(() => {
     if (!report?.recentReadings) return [];
     return report.recentReadings.filter((r: Reading) => {
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         Object.values(r).some(val => String(val).toLowerCase().includes(searchQuery.toLowerCase()));
-      
+
       if (!activeAttr) return matchesSearch;
 
       if (isNumeric(activeAttr)) {
@@ -77,56 +122,6 @@ export default function UserDashboard() {
       }
     });
   }, [report, searchQuery, activeAttr, filterValue, rangeValue]);
-
-  // Data Fetching
-  const fetchStatus = useCallback(async () => {
-    if (!user?.token) return;
-    try {
-      const response = await fetch(`${API_BASE}/full-report`, {
-        headers: { "Authorization": `Bearer ${user.token}` }
-      });
-      const data = await response.json();
-      setReport(data);
-    } catch (error) { console.error("Sync error:", error); }
-  }, [user?.token]);
-
-  const fetchSystemStatus = useCallback(async () => {
-    if (!user?.token) return;
-    try {
-      const response = await fetch(`${API_BASE}/simulation/status`, {
-        headers: { "Authorization": `Bearer ${user.token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSystemStatus(data.status);
-      }
-    } catch (error) { console.error("Status check failed"); }
-  }, [user?.token]);
-
-  const fetchWeeklyStats = useCallback(async () => {
-    if (!user?.token) return;
-    try {
-      const response = await fetch(`${API_BASE}/stats/weekly`, {
-        headers: { "Authorization": `Bearer ${user.token}` }
-      });
-      const data = await response.json();
-      setWeeklyStats(data);
-    } catch (error) { console.error("Weekly stats error:", error); }
-  }, [user?.token]);
-
-  useEffect(() => {
-    fetchSystemStatus();
-    fetchStatus();
-    fetchWeeklyStats();
-    const interval = setInterval(() => {
-      fetchSystemStatus();
-      if (systemStatus === "STREAMING") {
-        fetchStatus();
-        fetchWeeklyStats();
-      }
-    }, systemStatus === "STREAMING" ? 3000 : 10000);
-    return () => clearInterval(interval);
-  }, [systemStatus, fetchStatus, fetchSystemStatus, fetchWeeklyStats]);
 
   const handleDownloadReport = useCallback(() => {
     if (!filteredReadings.length) return;
@@ -151,20 +146,26 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="max-w-[1600px] mx-auto pt-24 pb-8 px-8 animate-fade-in">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Observer Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1 tracking-tight">Full infrastructure monitoring and diagnostics</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Observer Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">Infrastructure monitoring and AI diagnostics</p>
           </div>
-          <button 
-            disabled={!hasData}
-            onClick={handleDownloadReport}
-            className="flex items-center gap-2 bg-primary disabled:bg-muted text-primary-foreground px-4 py-2 rounded-xl font-bold text-xs uppercase transition-all shadow-lg hover:opacity-90 active:scale-95"
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-border">
+               <span className={`h-2 w-2 rounded-full ${systemStatus === 'STREAMING' ? 'bg-status-online animate-pulse' : 'bg-muted'}`} />
+               <span className="text-[10px] font-black uppercase tracking-widest">{systemStatus}</span>
+            </div>
+            <button
+              disabled={!hasData}
+              onClick={handleDownloadReport}
+              className="flex items-center gap-2 bg-primary disabled:bg-muted text-primary-foreground px-4 py-2 rounded-xl font-bold text-xs uppercase transition-all shadow-lg hover:opacity-90 active:scale-95"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Metrics Grid */}
@@ -185,15 +186,15 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Multi-Level Filtering Section */}
-        <div className="glass-card-elevated p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+        {/* Multi-Level Filtering Section - DIMENSIONI ORIGINALI CON SCROLLING */}
+        <div className="glass-card-elevated p-6 h-[600px] flex flex-col">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 shrink-0">
             <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-              <Activity className="h-4 w-4" /> Multi-Level Data Explorer
+              <Activity className="h-4 w-4 text-primary" /> Multi-Level Data Explorer
             </h3>
-            
+
             <div className="flex flex-wrap gap-3 items-center">
-              {/* Level 1: Attribute Selection with Proper Labels */}
+              {/* Field Selection */}
               <div className="relative group">
                 <button className="bg-secondary/50 border border-border/50 rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2 hover:bg-primary/10 transition-all uppercase tracking-wider">
                   <Filter className="h-3.5 w-3.5 text-primary" />
@@ -201,9 +202,9 @@ export default function UserDashboard() {
                 </button>
                 <div className="absolute top-full left-0 mt-2 w-48 bg-background border border-border rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
                   {Object.keys(labelMap).map(attr => (
-                    <button 
+                    <button
                       key={attr}
-                      onClick={() => { saveScroll(); setActiveAttr(attr as keyof Reading); setFilterValue("All"); }}
+                      onClick={() => { setActiveAttr(attr as keyof Reading); setFilterValue("All"); }}
                       className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 flex justify-between items-center group/item transition-colors"
                     >
                       {labelMap[attr]} <ChevronRight className="h-3 w-3 opacity-0 group-hover/item:opacity-100 text-primary" />
@@ -212,16 +213,16 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              {/* Level 2: Nested Values or Sliders */}
+              {/* Dynamic Value/Slider */}
               {activeAttr && (
                 <div className="flex items-center gap-3 animate-in slide-in-from-left-2">
                   {isNumeric(activeAttr) ? (
                     <div className="flex items-center gap-4 bg-primary/5 px-4 py-2 rounded-lg border border-primary/20">
                       <span className="text-[10px] font-black uppercase text-primary tracking-tighter">Limit:</span>
-                      <input 
+                      <input
                         type="range" min="0" max="200" step="1"
                         value={rangeValue[1]}
-                        onChange={(e) => { saveScroll(); setRangeValue([rangeValue[0], Number(e.target.value)]); }}
+                        onChange={(e) => setRangeValue([rangeValue[0], Number(e.target.value)])}
                         className="w-24 accent-primary"
                       />
                       <span className="text-xs font-mono font-bold text-primary">{rangeValue[1]}</span>
@@ -233,9 +234,9 @@ export default function UserDashboard() {
                       </button>
                       <div className="absolute top-full left-0 mt-2 w-48 bg-background border border-border rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] max-h-64 overflow-y-auto">
                         {uniqueValues.map(val => (
-                          <button 
+                          <button
                             key={val}
-                            onClick={() => { saveScroll(); setFilterValue(val); }}
+                            onClick={() => setFilterValue(val)}
                             className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/10 transition-colors"
                           >
                             {val}
@@ -250,19 +251,19 @@ export default function UserDashboard() {
               {/* Universal Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Fast search..."
                   className="bg-secondary/50 border border-border/50 rounded-lg pl-9 pr-4 py-2 text-xs w-40 outline-none focus:border-primary/50 transition-all font-medium"
                   value={searchQuery}
-                  onChange={(e) => { saveScroll(); setSearchQuery(e.target.value); }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              {/* Beautiful Reset Button */}
+              {/* Reset */}
               {(activeAttr || searchQuery !== "") && (
-                 <button 
-                   onClick={() => { saveScroll(); setActiveAttr(null); setFilterValue("All"); setSearchQuery(""); setRangeValue([0, 200]); }}
+                 <button
+                   onClick={() => { setActiveAttr(null); setFilterValue("All"); setSearchQuery(""); setRangeValue([0, 200]); }}
                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-white transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-sm"
                  >
                    <RotateCcw className="h-3 w-3" /> Reset
@@ -271,10 +272,12 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          <ReadingsTable readings={filteredReadings} maxRows={10} />
-          
+          <div className="flex-1 min-h-0">
+            <ReadingsTable readings={filteredReadings} maxRows={100} />
+          </div>
+
           {filteredReadings.length === 0 && (
-            <div className="py-20 text-center text-muted-foreground italic text-xs tracking-widest uppercase opacity-40">
+            <div className="flex-1 flex items-center justify-center text-muted-foreground italic text-xs tracking-widest uppercase opacity-40">
               No matching records found
             </div>
           )}

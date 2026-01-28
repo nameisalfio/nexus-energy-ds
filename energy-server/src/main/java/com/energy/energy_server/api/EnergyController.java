@@ -21,16 +21,16 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
-@RequestMapping("/api") 
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class EnergyController {
 
-    private final EnergySystemFacade facade; 
+    private final EnergySystemFacade facade;
 
     @PostMapping("/ingest-dataset")
     public ResponseEntity<?> ingestData(@RequestParam("file") MultipartFile file) {
         try {
-            facade.handleDatasetUpload(file); 
+            facade.handleDatasetUpload(file);
             return ResponseEntity.ok("Data ingested successfully");
         } catch (IOException e) {
             return ResponseEntity.internalServerError().build();
@@ -45,6 +45,11 @@ public class EnergyController {
     @PostMapping("/simulation/stop")
     public void stopSimulation() {
         facade.stopSimulation();
+    }
+
+    @GetMapping("/simulation/state")
+    public ResponseEntity<String> getSimulationState() {
+        return ResponseEntity.ok(facade.isSimulationRunning() ? "STREAMING" : "IDLE");
     }
 
     @GetMapping("/full-report")

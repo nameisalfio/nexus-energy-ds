@@ -22,7 +22,8 @@ export default function AdminDashboard() {
   const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
   const [isDatasetLoaded, setIsDatasetLoaded] = useState(false);
 
-  // Data Fetching: Infrastructure Report
+  // --- Data Fetching Logic ---
+
   const fetchStatus = useCallback(async () => {
     if (!user?.token) return;
     try {
@@ -37,7 +38,6 @@ export default function AdminDashboard() {
     }
   }, [user?.token]);
 
-  // Data Fetching: Weekly Analytics
   const fetchWeeklyStats = useCallback(async () => {
     if (!user?.token) return;
     try {
@@ -52,21 +52,51 @@ export default function AdminDashboard() {
     }
   }, [user?.token]);
 
-  // Polling Management
-  useEffect(() => {
-    fetchStatus();
-    if (systemStatus === "STREAMING") {
-      const interval = setInterval(() => {
-        fetchStatus();
-        fetchWeeklyStats();
-      }, 3000); 
-      return () => clearInterval(interval);
-    } else {
-      fetchWeeklyStats();
+  const syncSimulationState = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE}/simulation/state`, {
+        headers: { "Authorization": `Bearer ${user.token}` }
+      });
+      if (response.ok) {
+        const actualState = await response.text();
+        setSystemStatus(actualState as SystemStatus);
+      }
+    } catch (error) {
+      console.error("Failed to sync engine state:", error);
     }
-  }, [systemStatus, fetchStatus, fetchWeeklyStats]);
+  }, [user?.token]);
 
-  // Simulation Handlers
+  // --- Real-time Subscription (SSE) ---
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    // Initial sync
+    syncSimulationState();
+    fetchStatus();
+    fetchWeeklyStats();
+
+    const eventSource = new EventSource(`${API_BASE}/stream`);
+
+    eventSource.addEventListener("update", (event) => {
+      const newReport = JSON.parse(event.data);
+      setReport(newReport);
+      setSystemStatus("STREAMING");
+    });
+
+    eventSource.onerror = (err) => {
+      console.error("SSE Connection Error:", err);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [user?.token, fetchStatus, fetchWeeklyStats, syncSimulationState]);
+
+  // --- Handlers ---
+
   const handleStartSimulation = useCallback(async () => {
     if (!user?.token) return;
     try {
@@ -75,7 +105,7 @@ export default function AdminDashboard() {
         headers: { "Authorization": `Bearer ${user.token}` }
       });
       if (response.ok) {
-        setSystemStatus("STREAMING"); 
+        setSystemStatus("STREAMING");
         toast.success("Nexus Simulation Engine Online");
         fetchStatus();
       }
@@ -121,7 +151,7 @@ export default function AdminDashboard() {
   const handleUploadCSV = useCallback(async (file: File) => {
     if (!user?.token) return;
     setSystemStatus("PROCESSING");
-    
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -134,7 +164,7 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         toast.success("Dataset synchronized successfully");
-        setIsDatasetLoaded(true); 
+        setIsDatasetLoaded(true);
         await fetchStatus();
       }
     } catch (err) {
@@ -161,19 +191,17 @@ export default function AdminDashboard() {
       <AccessControlPanel isOpen={isAccessControlOpen} onClose={() => setIsAccessControlOpen(false)} />
 
       <main className="ml-[300px] pt-20 pb-8 px-6">
-        {/* Header Section */}
         <div className="mb-8 animate-fade-in flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Command Center</h1>
             <p className="text-muted-foreground mt-1 text-sm">Real-time infrastructure and predictive modeling</p>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-border">
-             <span className={`h-2 w-2 rounded-full ${systemStatus === 'STREAMING' ? 'bg-success animate-pulse' : 'bg-muted'}`} />
+             <span className={`h-2 w-2 rounded-full ${systemStatus === 'STREAMING' ? 'bg-status-online animate-pulse' : 'bg-muted'}`} />
              <span className="text-[10px] font-black uppercase tracking-widest">{systemStatus}</span>
           </div>
         </div>
 
-        {/* Top Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <MetricCard title="Avg Temp" value={report?.stats?.averageTemperature?.toFixed(1) || "0.0"} unit="°C" icon={Thermometer} />
           <MetricCard title="Energy Load" value={(report?.stats?.totalEnergyConsumption || 0).toFixed(1)} unit="kWh" icon={Zap} />
@@ -181,20 +209,17 @@ export default function AdminDashboard() {
           <MetricCard title="Telemetry Rows" value={report?.stats?.totalRecords?.toLocaleString() || "0"} unit="rows" icon={Activity} />
         </div>
 
-        {/* Analytics Section - Dual Chart Layout */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-          {/* Main Chart: Real-time actual vs predicted */}
           <div className="xl:col-span-2">
             <div className="glass-card-elevated p-6 h-[450px]">
               <div className="flex items-center gap-2 mb-6">
                 <Activity className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-sm uppercase tracking-widest">Consumption Stream (Live vs AI)</h3>
+                <h3 className="font-bold text-sm uppercase tracking-widest">Consumption Stream</h3>
               </div>
               <ConsumptionStreamChart readings={report?.recentReadings || []} />
             </div>
           </div>
 
-          {/* AI Digital Twin */}
           <div className="xl:col-span-1">
             {report?.aiInsights ? (
               <AIDigitalTwin
@@ -202,21 +227,19 @@ export default function AdminDashboard() {
                 expectedValue={report.aiInsights.expectedValue}
                 realValue={report.aiInsights.actualValue}
                 deviation={report.aiInsights.deviationPercent}
-                confidence={report.aiInsights.confidenceScore}
+                confidence={98} // Static for demo or mapped from DTO
                 isActive={systemStatus === "STREAMING"}
               />
             ) : (
               <div className="glass-card-elevated p-8 flex flex-col items-center justify-center h-full text-center border-dashed">
                 <Brain className="h-10 w-10 text-primary/20 mb-4 animate-pulse" />
-                <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter italic opacity-50">Synchronizing Predictive Engine...</p>
+                <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter italic opacity-50">Syncing AI...</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Secondary Analytics Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-           {/* Weekly Chart: Historial averages */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
            <div className="xl:col-span-1 glass-card-elevated p-6 h-[400px]">
               <div className="flex items-center gap-2 mb-6">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -225,14 +248,15 @@ export default function AdminDashboard() {
               <WeeklyEfficiencyChart data={weeklyStats} />
            </div>
 
-           {/* Table: Latest Logs */}
-           <div className="xl:col-span-2 glass-card-elevated p-6 h-[400px]">
-              <div className="flex items-center justify-between mb-4">
+           <div className="xl:col-span-2 glass-card-elevated p-6 h-[400px] flex flex-col">
+              <div className="flex items-center justify-between mb-4 shrink-0">
                 <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                   <Activity className="h-4 w-4 text-primary" /> Infrastructure Logs
                 </h3>
               </div>
-              <ReadingsTable readings={report?.recentReadings || []} maxRows={6} />
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ReadingsTable readings={report?.recentReadings || []} maxRows={100} />
+              </div>
            </div>
         </div>
       </main>
