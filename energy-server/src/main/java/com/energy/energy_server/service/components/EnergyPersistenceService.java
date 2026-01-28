@@ -27,7 +27,7 @@ public class EnergyPersistenceService {
 
     public final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private static long entityCounter = 0L;
-    private static final int ALERT_THRESHOLD = 25;
+    private static final int ALERT_THRESHOLD = 20;
 
     @CircuitBreaker(name = "energyDbBreaker", fallbackMethod = "fallbackSave")
     public void saveReading(EnergyReading entity) {
@@ -62,7 +62,7 @@ public class EnergyPersistenceService {
 
         try {
 
-            MDC.put("db_error_detail", t.getMessage());
+            MDC.put("failure_count", String.valueOf(currentFailures));
 
             if (currentFailures == 1) {
                 log.error("DB_STRESS | Initial database failure | ID: {} | Error: {}",
@@ -78,11 +78,8 @@ public class EnergyPersistenceService {
             sendToRabbitMQ(entity);
 
         } finally {
-            MDC.remove("db_error_detail");
+            MDC.clear();
         }
-
-        ensureCorrelationId(entity);
-        sendToRabbitMQ(entity);
 
     }
 
