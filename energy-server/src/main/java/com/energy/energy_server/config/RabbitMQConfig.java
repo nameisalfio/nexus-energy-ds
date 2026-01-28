@@ -24,8 +24,6 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_NAME = "energy_exchange";
     public static final String QUEUE_NAME = "energy_fallback_queue";
     public static final String ROUTING_KEY = "energy.reading.save";
-    public static final String ANOMALY_QUEUE = "energy_anomaly_queue";
-    public static final String ANOMALY_ROUTING_KEY = "energy.anomaly.#";
     public static final String DLQ_NAME = QUEUE_NAME + ".dlq";
 
     @Bean
@@ -41,7 +39,7 @@ public class RabbitMQConfig {
     public Queue fallbackQueue() {
         return QueueBuilder.durable(QUEUE_NAME)
                 .withArgument("x-queue-type", "quorum")
-                // TTL 7 giorni = 604800000ms
+                // TTL 7 days = 604800000ms
                 .withArgument("x-message-ttl", 604800000)
                 // RIMOSSO x-max-length per evitare scarto messaggi
                 // RIMOSSO x-overflow per non rifiutare publish
@@ -49,13 +47,6 @@ public class RabbitMQConfig {
                 .withArgument("x-dead-letter-routing-key", DLQ_NAME)
                 // Delivery limit: dopo 1000 tentativi falliti, va in DLQ
                 .withArgument("x-delivery-limit", 1000)
-                .build();
-    }
-
-    @Bean
-    public Queue anomalyQueue() {
-        return QueueBuilder.durable(ANOMALY_QUEUE)
-                .withArgument("x-queue-type", "quorum")
                 .build();
     }
 
@@ -75,11 +66,6 @@ public class RabbitMQConfig {
     @Bean
     public Binding binding(Queue fallbackQueue, TopicExchange exchange) {
         return BindingBuilder.bind(fallbackQueue).to(exchange).with(ROUTING_KEY);
-    }
-
-    @Bean
-    public Binding anomalyBinding(Queue anomalyQueue, TopicExchange exchange) {
-        return BindingBuilder.bind(anomalyQueue).to(exchange).with(ANOMALY_ROUTING_KEY);
     }
 
     @Bean
