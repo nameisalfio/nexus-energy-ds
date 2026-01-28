@@ -1,4 +1,8 @@
-# --- Maven Build Artifacts ---
+# ===============================
+# Build artifacts
+# ===============================
+
+# Maven / Java
 target/
 **/target/
 *.class
@@ -6,25 +10,63 @@ target/
 *.war
 *.ear
 
-# --- IDE Settings (IntelliJ / VS Code / Eclipse) ---
+# Node
+dist/
+build/
+coverage/
+
+# ===============================
+# Dependencies
+# ===============================
+
+# Node
+node_modules/
+**/node_modules/
+
+# ===============================
+# Lock files (IMPORTANT)
+# ===============================
+# DO NOT IGNORE:
+# package-lock.json
+# npm-shrinkwrap.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ===============================
+# Environment & secrets
+# ===============================
+.env
+.env.*
+!.env.example
+
+# ===============================
+# Logs & runtime files
+# ===============================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===============================
+# IDEs & editors
+# ===============================
+
+# IntelliJ
 .idea/
 *.iml
+
+# VS Code
 .vscode/
+!.vscode/extensions.json
+
+# Eclipse
 .settings/
 .classpath
 .project
 
-# --- OS Junk ---
+# ===============================
+# OS junk
+# ===============================
 .DS_Store
 Thumbs.db
-
-# --- Logs ---
-*.log
-
-# --- Environment Variables ---
-.env
-.env.*
-
-# --- Node modules ---
-node_modules/
-**/node_modules/
