@@ -26,7 +26,7 @@ export function AccessControlPanel({ isOpen, onClose }: AccessControlPanelProps)
     if (!currentUser?.token) return;
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8081/api/auth/users", {
+      const response = await fetch("http://localhost:8081/api/admin/users", {
         headers: { "Authorization": `Bearer ${currentUser.token}` }
       });
       if (!response.ok) throw new Error();
@@ -47,7 +47,7 @@ export function AccessControlPanel({ isOpen, onClose }: AccessControlPanelProps)
     if (!currentUser?.token) return;
     setChangingUserId(email); 
     try {
-      const response = await fetch("http://localhost:8081/api/auth/users/change-role", {
+      const response = await fetch("http://localhost:8081/api/admin/users/change-role", {
         method: "POST",
         headers: { 
           "Authorization": `Bearer ${currentUser.token}`,

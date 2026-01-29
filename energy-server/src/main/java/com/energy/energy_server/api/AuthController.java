@@ -46,12 +46,6 @@ public class AuthController {
     }
 
     @Data
-    static class RoleChangeRequest {
-        private String email;
-        private String newRole;
-    }
-
-    @Data
     @AllArgsConstructor
     @NoArgsConstructor
     static class RegisterRequest {
@@ -88,25 +82,6 @@ public class AuthController {
         return ResponseEntity.ok("User registered successfully");
     }
 
-    @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
-    }
-
-    @PostMapping("/users/change-role")
-    public ResponseEntity<?> changeRole(@RequestBody RoleChangeRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        try {
-            user.setRole(User.Role.valueOf(request.getNewRole().toUpperCase()));
-            userRepository.save(user);
-            return ResponseEntity.ok("Role updated to " + request.getNewRole());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid role");
-        }
-    }
-
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         authenticationManager.authenticate(
@@ -135,4 +110,5 @@ public class AuthController {
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("Server is Alive");
     }
+
 }
