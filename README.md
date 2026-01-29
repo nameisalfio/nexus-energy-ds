@@ -57,6 +57,16 @@ Each component is containerized, enabling reproducible deployment across environ
 
 ---
 
+### Enterprise Resilience & Reliability
+The system implements advanced reliability patterns to ensure zero data loss during high-load ingestion or infrastructure failures:
+
+*   **Circuit Breaker (Resilience4j):** Protects the system from cascading failures. If the database becomes unresponsive, the system automatically opens the circuit to prevent resource exhaustion.
+*   **Event-Driven Fallback:** When the database circuit is open, telemetry is transparently rerouted to **RabbitMQ Quorum Queues** for persistent buffering.
+*   **Self-Healing Recovery:** A dedicated background service automatically consumes the fallback queue and reconciles the data with the primary store once stability is restored.
+*   **Atomic Auditing:** An in-memory audit service tracks telemetry flow across CSV ingestion, queues, and database to guarantee data integrity.
+
+---
+
 ## 1. Presentation Layer – energy-client
 
 ### Technology Stack
@@ -233,23 +243,24 @@ All sensitive credentials are protected using the **BCrypt hashing algorithm** b
 
 ### Authentication & Identity Management
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | /api/register | Registers a new user with default USER role | Public |
-| POST | /api/login | Returns JWT and user profile | Public |
-| POST | /api/logout | Invalidates JWT via blacklist | Authenticated |
-| GET | /api/users | Lists all operators | Admin |
-| POST | /api/users/change-role | Updates user roles | Admin |
-| DELETE | /api/users/{id} | Deletes an operator account | Admin |
+| Method | Endpoint                     | Description | Access |
+|--------|------------------------------|-------------|--------|
+| POST | /api/auth/register           | Registers a new user with default USER role | Public |
+| POST | /api/auth/login              | Returns JWT and user profile | Public |
+| POST | /api/auth/logout             | Invalidates JWT via blacklist | Authenticated |
+| GET | /api/admin/users             | Lists all operators | Admin |
+| POST | /api/admin/users/change-role | Updates user roles | Admin |
+| DELETE | /api/admin/users/{id}        | Deletes an operator account | Admin |
 
 ### Telemetry & Simulation Control
 
-| Method | Endpoint | Description | Pattern |
-|--------|----------|-------------|--------|
-| POST | /api/simulation/start | Starts telemetry & inference | Command |
-| POST | /api/simulation/stop | Stops simulation | Command |
-| GET | /api/stream | SSE live telemetry feed | Observer |
-| GET | /api/health | System health check | Diagnostic |
+| Method | Endpoint              | Description                     | Pattern |
+|--------|-----------------------|---------------------------------|--------|
+| POST | /api/simulation/start | Starts telemetry & inference    | Command |
+| POST | /api/simulation/stop  | Stops simulation                | Command |
+| GET | /api/stream           | SSE live telemetry feed         | Observer |
+| GET | /api/auth/health      | Checks if simulation is running | Diagnostic |
+| GET | /api/simulation/state | System state check              | Diagnostic |
 
 ### Aggregated Analytics
 
