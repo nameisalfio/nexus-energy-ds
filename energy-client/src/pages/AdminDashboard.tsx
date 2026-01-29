@@ -140,6 +140,12 @@ export default function AdminDashboard() {
       });
       if (response.ok) {
         toast.success("Core database purged");
+
+        setReport(null);
+        setWeeklyStats([]);
+
+        setSystemStatus("IDLE");
+
         fetchStatus();
         fetchWeeklyStats();
       }

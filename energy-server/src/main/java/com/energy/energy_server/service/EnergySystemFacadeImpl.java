@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -127,7 +128,15 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
         simulationService.stop();
         energyReadingRepository.deleteAllInBatch();
         analyticsService.clearHistory();
+
+        this.lastSnapshot = new SystemReportDTO(
+                new SystemReportDTO.StatsDTO(0.0, 0.0, 0.0, 0),
+                new AiInsightDTO(false, 0.0, 0.0, 0.0, "System Reset"),
+                new ArrayList<>()
+        );
+
         log.warn("NEXUS_CORE | Full purge executed manually");
+
     }
 
     @Override
