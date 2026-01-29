@@ -52,7 +52,7 @@ The project follows a distributed, multi‑tier architecture orchestrated via Do
 Each component is containerized, enabling reproducible deployment across environments. Below is the high-level architecture diagram illustrating the system's components and their interactions:
 
 <p align="center">
-    <img src="assets/architecture_diagram.jpeg" alt="System Architecture" width="450">
+    <img src="assets/architecture_diagram.png" alt="System Architecture" width="450">
 </p>
 
 ---

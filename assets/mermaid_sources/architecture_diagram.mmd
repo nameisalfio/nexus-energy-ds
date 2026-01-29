@@ -55,8 +55,8 @@ flowchart TB
     Logstash --> Elasticsearch
     Elasticsearch --> Kibana
     ReactApp -- "1. HTTP REST / JSON" --> Auth
-    Repo -- "2. JPA / JDBC" --> MySQL
-    AI -. Publish Event .-> RabbitMQ
+    Repo -- "JPA / JDBC" --> MySQL
+    CB_Database -- "Recovery" --> RabbitMQ
     Server_App -. Logs .-> Logstash
     Browser_Env ~~~ Server_App
     Server_App ~~~ Data_Service & Messaging_Service & ELK_Stack
