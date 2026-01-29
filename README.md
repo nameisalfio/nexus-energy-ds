@@ -259,8 +259,8 @@ All sensitive credentials are protected using the **BCrypt hashing algorithm** b
 | POST | /api/simulation/start | Starts telemetry & inference    | Command |
 | POST | /api/simulation/stop  | Stops simulation                | Command |
 | GET | /api/stream           | SSE live telemetry feed         | Observer |
-| GET | /api/auth/health      | Checks if simulation is running | Diagnostic |
-| GET | /api/simulation/state | System state check              | Diagnostic |
+| GET | /api/auth/health      | System state check              | Diagnostic |
+| GET | /api/simulation/state | Checks if simulation is running | Diagnostic |
 
 ### Aggregated Analytics
 
