@@ -40,7 +40,11 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
         log.info("NEXUS_CORE | System Startup: Purging old telemetry");
         energyReadingRepository.deleteAllInBatch();
         analyticsService.clearHistory();
-        this.lastSnapshot = new SystemReportDTO(new SystemReportDTO.StatsDTO(0, 0, 0, 0), null, List.of());
+        this.lastSnapshot = new SystemReportDTO(
+                new SystemReportDTO.StatsDTO(0, 0, 0, 0),
+                new AiInsightDTO(false, 0.0, 0.0, 0.0, "System Initialized"), // Niente più null
+                new ArrayList<>()
+        );
     }
 
     @Override
