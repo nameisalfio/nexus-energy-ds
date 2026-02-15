@@ -133,10 +133,17 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
 
   const logout = useCallback(() => {
     console.log("👋 [AuthContext] Logging out..."); // LOG
+    const token = user?.token;
+    if (token) {
+      fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch((err) => console.warn("Logout API call failed:", err));
+    }
     setUser(null);
     Cookies.remove(COOKIE_NAME);
     console.log("🗑️ [AuthContext] Cookie removed."); // LOG
-  }, []);
+  }, [user?.token]);
 
   const authValue = useMemo(() => ({
     user,
