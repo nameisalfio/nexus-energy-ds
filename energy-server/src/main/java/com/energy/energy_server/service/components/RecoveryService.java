@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.JDBCConnectionException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 public class RecoveryService {
 
     private final EnergyReadingRepository energyRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
     private final AuditService auditService;
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME, concurrency = "5-10")
@@ -46,6 +49,7 @@ public class RecoveryService {
             // Save recovered entity
             energyReading.setCorrelationId(messageId);
             energyRepository.save(energyReading);
+            eventPublisher.publishEvent(energyReading);
 
             auditService.incrementReceived(); 
             auditService.logStatus(); 
