@@ -1,12 +1,14 @@
 package com.energy.energy_server.service;
 
 import java.io.File;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
+import org.nd4j.linalg.dataset.api.preprocessor.NormalizerStandardize;
 import org.nd4j.linalg.dataset.api.preprocessor.serializer.NormalizerSerializer;
 import org.nd4j.linalg.factory.Nd4j;
 import org.slf4j.MDC;
@@ -26,38 +28,34 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class AiModelServiceImpl implements AiModelService {
 
-    private static final double ANOMALY_THRESHOLD = 0.2; // 20% allowed deviation
+    // Based on our 3.91 kWh MAE.
+    // We consider an anomaly if deviation > 2.5 * MAE (approx. 99% confidence)
+    private static final double DYNAMIC_MAE_THRESHOLD = 3.91 * 2.5;
+
     private static final String MSG_ANOMALY = "ANOMALY_ALERT: Anomaly detected: consumption deviates from expected pattern.";
     private static final String MSG_NORMAL = "System operating within normal parameters.";
 
     private final EnergyReadingRepository energyReadingRepository;
 
     private MultiLayerNetwork model;
-    private DataNormalization normalizer;
+    private NormalizerStandardize normalizer;
 
     @PostConstruct
     @Override
     public void init() {
         try {
-            // Load Model
             File modelFile = new File(ModelConfig.MODEL_EXPORT_PATH);
-            if (modelFile.exists()) {
-                model = ModelSerializer.restoreMultiLayerNetwork(modelFile);
-                log.info("AI Model loaded successfully from: {}", modelFile.getAbsolutePath());
-            } else {
-                log.error("Model file not found at {}.", modelFile.getAbsolutePath());
-            }
-
-            // Load Normalizer
             File normFile = new File(ModelConfig.NORMALIZER_EXPORT_PATH);
-            if (normFile.exists()) {
+
+            if (modelFile.exists() && normFile.exists()) {
+                model = ModelSerializer.restoreMultiLayerNetwork(modelFile);
                 normalizer = NormalizerSerializer.getDefault().restore(normFile);
-                log.info("Normalizer loaded successfully.");
+                log.info("Digital Twin AI Engine initialized with MAE-base: 3.91 kWh");
             } else {
-                log.error("Normalizer file not found.");
+                log.warn("AI Assets missing. Models must be trained before inference is available.");
             }
         } catch (Exception e) {
-            log.error("Error loading AI components", e);
+            log.error("Failed to initialize AI Service", e);
         }
     }
 
@@ -66,15 +64,16 @@ public class AiModelServiceImpl implements AiModelService {
         List<EnergyReading> history = energyReadingRepository.findTop100ByOrderByTimestampDesc();
         double predicted = predictNextHour(history);
         double actual = reading.getEnergyConsumption() != null ? reading.getEnergyConsumption() : 0.0;
-        
-        double deviation = predicted > 0 ? ((actual - predicted) / predicted) * 100 : 0.0;
-        boolean anomaly = Math.abs(deviation) > (ANOMALY_THRESHOLD * 100);
+
+        // Dynamic Threshold Logic: Using absolute error instead of percentage
+        double absoluteDeviation = actual - predicted;
+        boolean isAnomaly = Math.abs(absoluteDeviation) > DYNAMIC_MAE_THRESHOLD;
 
         // Anomaly message
-        if (anomaly) {
+        if (isAnomaly) {
             try {
                 MDC.put("event_type", "ANOMALY");
-                MDC.put("anomaly_deviation", String.format("%.2f", deviation));
+                MDC.put("anomaly_deviation", String.format("%.2f", absoluteDeviation));
                 MDC.put("anomaly_predicted", String.format("%.2f", predicted));
                 MDC.put("anomaly_actual", String.format("%.2f", actual));
 
@@ -82,80 +81,85 @@ public class AiModelServiceImpl implements AiModelService {
                         MSG_ANOMALY,
                         String.format("%.2f", predicted),
                         String.format("%.2f", actual),
-                        String.format("%.2f", deviation));
+                        String.format("%.2f", absoluteDeviation));
             } finally {
                 MDC.clear();
             }
         } else {
-            log.info("{} | Deviation: {}%", MSG_NORMAL, String.format("%.2f", deviation));
+            log.info("{} | Deviation: {}%", MSG_NORMAL, String.format("%.2f", absoluteDeviation));
         }
     
-        String suggestion = generateSmartSuggestion(reading, actual, predicted, deviation);
+        String suggestion = generateSmartSuggestion(reading, actual, predicted, absoluteDeviation);
     
         return new AiInsightDTO(
-            anomaly,
+            isAnomaly,
             predicted,
             actual,
-            deviation,
+            absoluteDeviation,
             suggestion
         );
     }
 
     private String generateSmartSuggestion(EnergyReading r, double actual, double predicted, double dev) {
-        if (dev > 10 && r.getOccupancy() < 10) {
-            return "High consumption detected in near-empty zone. Check for ghost loads or active HVAC in unused areas.";
+        if (dev > DYNAMIC_MAE_THRESHOLD && r.getOccupancy() < 5) {
+            return "Critical: High energy drain in an empty building. Potential HVAC override or lighting failure.";
         }
-        
-        if (r.getRenewableEnergy() > 40 && r.getHvacUsage().equalsIgnoreCase("OFF")) {
-            return "Peak renewable generation active. Strategic window for high-load maintenance or pre-cooling.";
+        if (r.getRenewableEnergy() > 50 && actual > predicted) {
+            return "Generation Surplus: Utilizing extra renewable power for current demand.";
         }
-    
-        if (r.getTemperature() > 26 && r.getHvacUsage().equalsIgnoreCase("OFF")) {
-            return "Thermal threshold exceeded. AI suggests activating HVAC Stage 1 to prevent peak demand spikes later.";
-        }
-    
-        return dev < 0 ? "System performing above efficiency baseline." : "Operational parameters nominal.";
+        return "Performance aligns with Digital Twin baseline.";
     }
 
     @Override
     public double predictNextHour(List<EnergyReading> history) {
-        if (model == null || normalizer == null || history.isEmpty()) return 0.0;
-        
-        // Fallback to the latest known value if history is insufficient
-        if (history.size() < ModelConfig.TIME_STEPS) {
-             return history.get(0).getEnergyConsumption() != null ? history.get(0).getEnergyConsumption() : 0.0;
+        if (model == null || normalizer == null || history.size() < ModelConfig.TIME_STEPS) {
+            return 0.0;
         }
 
         try {
-            int timeSteps = ModelConfig.TIME_STEPS;
-            INDArray input = Nd4j.create(new int[]{1, ModelConfig.INPUT_FEATURES, timeSteps});
+            int steps = ModelConfig.TIME_STEPS;
+            // IMPORTANT: Shape must match [1, 6, 12] as per our "Gold" model
+            INDArray input = Nd4j.create(new int[]{1, ModelConfig.INPUT_FEATURES, steps}, 'c');
 
-            for (int t = 0; t < timeSteps; t++) {
-                // history is sorted DESC. We map it to the time steps expected by the model.
-                // t=0 (start) -> oldest record
-                // t=23 (end) -> most recent record
-                EnergyReading r = history.get(timeSteps - 1 - t);
-                
+            for (int t = 0; t < steps; t++) {
+                // history is DESC (0 is most recent). Map t=0 to oldest in window.
+                EnergyReading r = history.get(steps - 1 - t);
+                // Feature Engineering (Synchronized with Train.java)
                 double temp = r.getTemperature() != null ? r.getTemperature() : 0.0;
-                double hum = r.getHumidity() != null ? r.getHumidity() : 0.0;
                 double occ = r.getOccupancy() != null ? r.getOccupancy() : 0.0;
-                double cons = r.getEnergyConsumption() != null ? r.getEnergyConsumption() : 0.0;
+                double hvac = "ON".equalsIgnoreCase(r.getHvacUsage()) ? 1.0 : 0.0;
+                // Lag1h (Consumption of previous record)
+                double lag = 0.0;
+                if ((steps - 1 - t + 1) < history.size()) {
+                    lag = history.get(steps - t).getEnergyConsumption();
+                }
+
+                // Time Cyclical Features
+                LocalDateTime ldt = r.getTimestamp().atZone(ZoneId.systemDefault()).toLocalDateTime();
+                int hour = ldt.getHour();
+                double hSin = Math.sin(2 * Math.PI * hour / 24.0);
+                double hCos = Math.cos(2 * Math.PI * hour / 24.0);
 
                 input.putScalar(new int[]{0, 0, t}, temp);
-                input.putScalar(new int[]{0, 1, t}, hum);
-                input.putScalar(new int[]{0, 2, t}, occ);
-                input.putScalar(new int[]{0, 3, t}, cons);
+                input.putScalar(new int[]{0, 1, t}, occ);
+                input.putScalar(new int[]{0, 2, t}, hvac);
+                input.putScalar(new int[]{0, 3, t}, lag);
+                input.putScalar(new int[]{0, 4, t}, hSin);
+                input.putScalar(new int[]{0, 5, t}, hCos);
             }
 
             normalizer.transform(input);
             INDArray output = model.output(input);
-            normalizer.revertLabels(output);
-
-            return Math.max(0.0, output.getDouble(0, 0, timeSteps - 1));
+            // Revert labels manually (output is [1, 1, 12])
+            double normPred = output.getDouble(0, 0, steps - 1);
+            double mean = normalizer.getLabelMean().getDouble(0);
+            double std = normalizer.getLabelStd().getDouble(0);
+            return Math.max(0.0, (normPred * std) + mean);
 
         } catch (Exception e) {
-            log.error("AI Prediction failed", e);
+            log.error("Inference Error", e);
             return 0.0;
         }
     }
+
 }
