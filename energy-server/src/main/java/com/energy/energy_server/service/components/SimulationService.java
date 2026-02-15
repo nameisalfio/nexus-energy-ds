@@ -32,7 +32,7 @@ public class SimulationService {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
 
     private static final int FIXED_RATE_MS = 2000;
-    private static final int BURST_SIZE = 24;
+    private static final int BURST_SIZE = 12;
 
     public void loadQueue(List<EnergyReading> readings) {
         ingestionQueue.clear();
