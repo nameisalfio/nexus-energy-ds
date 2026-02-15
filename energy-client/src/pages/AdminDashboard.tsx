@@ -100,7 +100,7 @@ export default function AdminDashboard() {
   const handleStartSimulation = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const response = await fetch(`${API_BASE}/simulation/start`, {
+      const response = await fetch(`${API_BASE}/admin/simulation/start`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${user.token}` }
       });
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
   const handleStopSimulation = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const response = await fetch(`${API_BASE}/simulation/stop`, {
+      const response = await fetch(`${API_BASE}/admin/simulation/stop`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${user.token}` }
       });
@@ -162,7 +162,7 @@ export default function AdminDashboard() {
     formData.append("file", file);
 
     try {
-      const response = await fetch(`${API_BASE}/ingest-dataset`, {
+      const response = await fetch(`${API_BASE}/admin/ingest-dataset`, {
         method: 'POST',
         headers: { "Authorization": `Bearer ${user.token}` },
         body: formData,
