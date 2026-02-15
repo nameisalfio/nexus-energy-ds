@@ -34,6 +34,7 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
+    private static final int BURST_SIZE = 12;
 
     @PostConstruct
     public void init() {
@@ -119,6 +120,18 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
         if (reading == null || reading.getId() == null) {
             return new AiInsightDTO(false, 0.0, 0.0, 0.0, "Waiting for data...");
         }
+
+        long recordCount = energyReadingRepository.count();
+        if (recordCount < BURST_SIZE) {
+            return new AiInsightDTO(
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    String.format("AI Warmup: %d/%d records", recordCount, BURST_SIZE)
+            );
+        }
+
         try {
             return aiModelService.analyze(reading);
         } catch (Exception e) {
