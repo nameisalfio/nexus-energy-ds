@@ -1,426 +1,429 @@
 {
-	"info": {
-		"_postman_id": "43be32c7-7f6b-444e-a515-f581a9bf83a6",
-		"name": "Nexus Energy API",
-		"description": "Full collection for Nexus Energy Distributed Service.\nIncludes automated Auth token management and all Administrative endpoints.",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "34399215"
-	},
-	"item": [
-		{
-			"name": "Auth & Identity",
-			"item": [
-				{
-					"name": "Health Check",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/auth/health",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"auth",
-								"health"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Register New User",
-					"request": {
-						"auth": {
-							"type": "noauth"
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"new_observer2\",\n    \"email\": \"observer2@nexus.com\",\n    \"password\": \"password123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/register",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"auth",
-								"register"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Login (Admin)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.token) {",
-									"    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
-									"    console.log(\"Token updated successfully for Admin\");",
-									"}"
-								],
-								"type": "text/javascript",
-								"packages": {},
-								"requests": {}
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "noauth"
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"admin@nexus.com\",\n    \"password\": \"admin\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"auth",
-								"login"
-							]
-						},
-						"description": "Logs in the default admin and automatically saves the JWT token to the collection variables."
-					},
-					"response": []
-				},
-				{
-					"name": "Login (User)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.token) {",
-									"    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
-									"    console.log(\"Token updated successfully for User\");",
-									"}"
-								],
-								"type": "text/javascript",
-								"packages": {},
-								"requests": {}
-							}
-						},
-						{
-							"listen": "prerequest",
-							"script": {
-								"packages": {},
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "noauth"
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"user@nexus.com\",\n    \"password\": \"user\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"auth",
-								"login"
-							]
-						},
-						"description": "Logs in as a standard user. Useful to test permission denials on Admin endpoints."
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/auth/logout",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"auth",
-								"logout"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Simulation & Data",
-			"item": [
-				{
-					"name": "Upload Dataset (CSV)",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "file",
-									"description": "Select the Energy_consumption.csv file here",
-									"type": "file",
-									"src": "/Users/gabrieleruggieri/Desktop/nexus-energy-ds/energy-server/dataset/Energy_consumption.csv"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/ingest-dataset",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"ingest-dataset"
-							]
-						},
-						"description": "Requires multipart/form-data with a 'file' key."
-					},
-					"response": []
-				},
-				{
-					"name": "Get Simulation State",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/simulation/state",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"simulation",
-								"state"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Start Simulation",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/simulation/start",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"simulation",
-								"start"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Stop Simulation",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/simulation/stop",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"simulation",
-								"stop"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Admin Operations",
-			"item": [
-				{
-					"name": "Change User Role",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"observer2@nexus.com\",\n    \"newRole\": \"ADMIN\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/admin/users/change-role",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"admin",
-								"users",
-								"change-role"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Purge Database",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/admin/data/clear",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"admin",
-								"data",
-								"clear"
-							]
-						},
-						"description": "Stops simulation and wipes DB. Requires ADMIN role."
-					},
-					"response": []
-				},
-				{
-					"name": "Get All Users",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/admin/users",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"admin",
-								"users"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Analytics Views",
-			"item": [
-				{
-					"name": "Get Full Report (Snapshot)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/full-report",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"full-report"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Weekly Stats",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/stats/weekly",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"stats",
-								"weekly"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{jwt_token}}",
-				"type": "string"
-			}
-		]
-	},
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"requests": {},
-				"exec": [
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"requests": {},
-				"exec": [
-					""
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:8081/api"
-		},
-		{
-			"key": "jwt_token",
-			"value": ""
-		}
-	]
+  "info": {
+    "_postman_id": "43be32c7-7f6b-444e-a515-f581a9bf83a6",
+    "name": "Nexus Energy API",
+    "description": "Full collection for Nexus Energy Distributed Service.\nIncludes automated Auth token management and all Administrative endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "34399215"
+  },
+  "item": [
+    {
+      "name": "Auth & Identity",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register New User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"new_observer2\",\n    \"email\": \"observer2@nexus.com\",\n    \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
+                  "    console.log(\"Token updated successfully for Admin\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@nexus.com\",\n    \"password\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in the default admin and automatically saves the JWT token to the collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
+                  "    console.log(\"Token updated successfully for User\");",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "packages": {},
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"user@nexus.com\",\n    \"password\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in as a standard user. Useful to test permission denials on Admin endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Simulation & Data",
+      "item": [
+        {
+          "name": "Upload Dataset (CSV)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "description": "Select the Energy_consumption.csv file here",
+                  "type": "file",
+                  "src": "/Users/gabrieleruggieri/Desktop/nexus-energy-ds/energy-server/dataset/Energy_consumption.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/ingest-dataset",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ingest-dataset"
+              ]
+            },
+            "description": "Requires multipart/form-data with a 'file' key."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Simulation State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/simulation/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "simulation",
+                "state"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Simulation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/simulation/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "simulation",
+                "start"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Simulation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/simulation/stop",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "simulation",
+                "stop"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Operations",
+      "item": [
+        {
+          "name": "Change User Role",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"observer2@nexus.com\",\n    \"newRole\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/change-role",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "change-role"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Purge Database",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/data/clear",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "data",
+                "clear"
+              ]
+            },
+            "description": "Stops simulation and wipes DB. Requires ADMIN role."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Analytics Views",
+      "item": [
+        {
+          "name": "Get Full Report (Snapshot)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/full-report",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "full-report"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Weekly Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/stats/weekly",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "stats",
+                "weekly"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8081/api"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    }
+  ]
 }

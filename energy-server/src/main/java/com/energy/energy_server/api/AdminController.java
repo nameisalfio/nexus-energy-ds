@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -55,6 +57,26 @@ public class AdminController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Invalid role");
         }
+    }
+
+    @PostMapping("/ingest-dataset")
+    public ResponseEntity<?> ingestData(@RequestParam("file") MultipartFile file) {
+        try {
+            facade.handleDatasetUpload(file);
+            return ResponseEntity.ok("Data ingested successfully");
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/simulation/start")
+    public void startSimulation() {
+        facade.startSimulation();
+    }
+
+    @PostMapping("/simulation/stop")
+    public void stopSimulation() {
+        facade.stopSimulation();
     }
 
 }
