@@ -28,19 +28,13 @@ public class AnalyticsService {
         log.info("Analytics history cleared");
     }
 
-    public EnergyReading getLatestReading() {
-        return energyReadingRepository.findTop100ByOrderByTimestampDesc().stream()
-                .findFirst()
-                .orElse(new EnergyReading());
-    }
-
     public SystemReportDTO generateReport(EnergyReading latest, AiInsightDTO aiInsights) {
 
         if (aiInsights== null) {
             aiInsights= new AiInsightDTO(false, 0.0, 0.0, 0.0, "AI Unavailable");
         }
 
-        List<EnergyReading> recent = energyReadingRepository.findTop100ByOrderByTimestampDesc();
+        List<EnergyReading> recent = energyReadingRepository.findAll();
         
         double avgTemp = recent.stream().mapToDouble(r -> r.getTemperature() != null ? r.getTemperature() : 0.0).average().orElse(0.0);
         double totalEnergy = recent.stream().mapToDouble(r -> r.getEnergyConsumption() != null ? r.getEnergyConsumption() : 0.0).sum();
