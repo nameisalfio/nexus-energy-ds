@@ -36,11 +36,14 @@ public class JwtService {
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
-        String role = userDetails.getAuthorities().stream()
+        String fullRole = userDetails.getAuthorities().stream()
                 .map(authority -> authority.getAuthority())
                 .findFirst()
                 .orElse("ROLE_USER");
-        claims.put("role", role); 
+
+        String cleanRole = fullRole.replaceFirst("^ROLE_", "");
+        claims.put("role", cleanRole);
+
         return generateToken(claims, userDetails);
     }
 
