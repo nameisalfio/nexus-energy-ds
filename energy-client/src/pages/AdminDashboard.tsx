@@ -85,6 +85,11 @@ export default function AdminDashboard() {
       setSystemStatus("STREAMING");
     });
 
+    eventSource.addEventListener("status", (event) => {
+      const status = event.data as SystemStatus;
+      if (status === "IDLE" || status === "STREAMING") setSystemStatus(status);
+    });
+
     eventSource.onerror = (err) => {
       console.error("SSE Connection Error:", err);
       eventSource.close();

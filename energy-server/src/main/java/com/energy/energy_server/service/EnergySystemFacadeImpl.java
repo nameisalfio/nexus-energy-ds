@@ -60,11 +60,13 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
     @Override
     public void startSimulation() {
         simulationService.start();
+        broadcastStatus("STREAMING");
     }
 
     @Override
     public void stopSimulation() {
         simulationService.stop();
+        broadcastStatus("IDLE");
     }
 
     @EventListener
@@ -116,6 +118,16 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
         }
     }
 
+    private void broadcastStatus(String status) {
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("status").data(status));
+            } catch (Exception e) {
+                emitters.remove(emitter);
+            }
+        }
+    }
+
     private AiInsightDTO getAiInsightsSafe(EnergyReading reading) {
         if (reading == null || reading.getId() == null) {
             return new AiInsightDTO(false, 0.0, 0.0, 0.0, "Waiting for data...");
@@ -143,6 +155,7 @@ public class EnergySystemFacadeImpl implements EnergySystemFacade {
     @Override
     public void clearAllData() {
         simulationService.stop();
+        broadcastStatus("IDLE");
         energyReadingRepository.deleteAllInBatch();
         analyticsService.clearHistory();
 

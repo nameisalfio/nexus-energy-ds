@@ -91,6 +91,11 @@ export default function UserDashboard() {
       setSystemStatus("STREAMING");
     });
 
+    eventSource.addEventListener("status", (event) => {
+      const status = event.data as SystemStatus;
+      if (status === "IDLE" || status === "STREAMING") setSystemStatus(status);
+    });
+
     eventSource.onerror = () => {
       eventSource.close();
     };
