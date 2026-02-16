@@ -111,6 +111,10 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION_MS=${JWT_EXPIRATION_MS}
       - "JAVA_OPTS=-Xms512m -Xmx512m -Dorg.bytedeco.javacpp.maxbytes=512m"
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER:-guest}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
     volumes:
       - ./energy-server/data:/app/data
     networks:

@@ -3,6 +3,8 @@ package com.energy.energy_server.service.components;
 import com.energy.energy_server.config.RabbitMQConfig;
 import com.energy.energy_server.model.EnergyReading;
 import com.energy.energy_server.repository.EnergyReadingRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.JDBCConnectionException;
@@ -20,13 +22,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RecoveryService {
 
+    private static final String CIRCUIT_BREAKER_NAME = "energyDbBreaker";
+
     private final EnergyReadingRepository energyRepository;
     private final ApplicationEventPublisher eventPublisher;
-
     private final AuditService auditService;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME, concurrency = "5-10")
-    // Concurrency handling to avoid race conditions during recovery
+    @CircuitBreaker(name = "energyDbBreaker", fallbackMethod = "fallbackRecover")
     public void recoverData(
             EnergyReading energyReading,
             @Header(AmqpHeaders.MESSAGE_ID) String messageId) {
@@ -40,10 +44,14 @@ public class RecoveryService {
         }
 
         try {
-            // Check for duplicates before saving
-            if (energyRepository.existsByCorrelationId(messageId)) {
-                log.warn("RECOVERY_SKIP | ID: {} | Reason: Duplicate already in DB", messageId);
-                return;
+            // Duplicate check when DB is reachable (HALF_OPEN or CLOSED). OPEN → fallback before we get here.
+            var state = circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER_NAME).getState();
+            if (state == io.github.resilience4j.circuitbreaker.CircuitBreaker.State.HALF_OPEN
+                    || state == io.github.resilience4j.circuitbreaker.CircuitBreaker.State.CLOSED) {
+                if (energyRepository.existsByCorrelationId(messageId)) {
+                    log.warn("RECOVERY_SKIP | ID: {} | Reason: Duplicate already in DB", messageId);
+                    return;
+                }
             }
 
             // Save recovered entity
@@ -79,12 +87,14 @@ public class RecoveryService {
             throw e;
 
         } catch (Exception e) {
-            log.error("RECOVERY_ERROR | ID: {} | Reason: {} | Message: {} | Action: Message requeued",
-                    messageId,
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
-
+            log.error("RECOVERY_FAILED | ID: {} | Reason: {} | Message: {} | Action: Requeued",
+                    messageId, e.getClass().getSimpleName(), e.getMessage());
             throw e;
         }
+    }
+
+    public void fallbackRecover(EnergyReading energyReading, String messageId, Throwable t) {
+        log.warn("RECOVERY_FAILED | ID: {} | Reason: Circuit breaker OPEN (DB down) | Action: Requeued", messageId);
+        throw new IllegalStateException("Database unavailable (circuit breaker open), message requeued", t);
     }
 }

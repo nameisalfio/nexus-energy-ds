@@ -25,6 +25,7 @@ public class IngestionService {
 
     private final EnergyReadingRepository repository;
     private final SimulationService simulationService;
+    private final AuditService auditService;
 
     public void handleUpload(MultipartFile file) throws Exception {
         List<EnergyReading> readings = new ArrayList<>();
@@ -60,6 +61,7 @@ public class IngestionService {
 
             if (!readings.isEmpty()) {
                 repository.deleteAllInBatch();
+                auditService.reset(readings.size());
                 simulationService.loadQueue(readings);
                 log.info("Ingested {} records", readings.size());
             }

@@ -43,8 +43,8 @@ public class RabbitMQConfig {
                 .withArgument("x-message-ttl", 604800000)
                 .withArgument("x-dead-letter-exchange", "")
                 .withArgument("x-dead-letter-routing-key", DLQ_NAME)
-                // Delivery limit -> DLQ
-                .withArgument("x-delivery-limit", 1000)
+                // Delivery limit -> DLQ (high to avoid DLQ during prolonged DB outages with rapid requeues)
+                .withArgument("x-delivery-limit", 10000)
                 .build();
     }
 
