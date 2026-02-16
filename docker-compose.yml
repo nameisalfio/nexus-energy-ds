@@ -71,6 +71,8 @@ services:
       - "5001:5000"
     environment:
       - "LS_JAVA_OPTS=-Xms512m -Xmx512m"
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     networks:
       - energy-net
     depends_on:
