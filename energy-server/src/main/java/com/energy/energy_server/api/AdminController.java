@@ -1,5 +1,6 @@
 package com.energy.energy_server.api;
 
+import com.energy.energy_server.exception.UserNotFoundException;
 import com.energy.energy_server.model.User;
 import com.energy.energy_server.repository.UserRepository;
 import com.energy.energy_server.service.EnergySystemFacade;
@@ -9,6 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,7 +30,12 @@ public class AdminController {
 
     @Data
     static class RoleChangeRequest {
+        @NotBlank(message = "Email is required")
+        @Email(message = "Invalid email format")
         private String email;
+
+        @NotBlank(message = "Role is required")
+        @Pattern(regexp = "USER|ADMIN", message = "Role must be USER or ADMIN")
         private String newRole;
     }
 
@@ -35,6 +46,9 @@ public class AdminController {
 
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException("User not found");
+        }
         userRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
@@ -46,27 +60,23 @@ public class AdminController {
     }
 
     @PostMapping("/users/change-role")
-    public ResponseEntity<?> changeRole(@RequestBody RoleChangeRequest request) {
+    public ResponseEntity<?> changeRole(@Valid @RequestBody RoleChangeRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         try {
             user.setRole(User.Role.valueOf(request.getNewRole().toUpperCase()));
             userRepository.save(user);
             return ResponseEntity.ok("Role updated to " + request.getNewRole());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid role");
+            throw new IllegalArgumentException("Invalid role");
         }
     }
 
     @PostMapping("/ingest-dataset")
-    public ResponseEntity<?> ingestData(@RequestParam("file") MultipartFile file) {
-        try {
-            facade.handleDatasetUpload(file);
-            return ResponseEntity.ok("Data ingested successfully");
-        } catch (IOException e) {
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<?> ingestData(@RequestParam("file") MultipartFile file) throws IOException {
+        facade.handleDatasetUpload(file);
+        return ResponseEntity.ok("Data ingested successfully");
     }
 
     @PostMapping("/simulation/start")

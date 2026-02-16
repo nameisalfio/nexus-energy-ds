@@ -15,12 +15,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.energy.energy_server.exception.UserAlreadyExistsException;
+import com.energy.energy_server.exception.UserNotFoundException;
 import com.energy.energy_server.model.User;
 import com.energy.energy_server.repository.UserRepository;
 import com.energy.energy_server.security.JwtService;
 import com.energy.energy_server.security.TokenBlacklistService;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +47,11 @@ public class AuthController {
     @AllArgsConstructor
     @NoArgsConstructor
     static class AuthRequest {
-        private String email;    
+        @NotBlank(message = "Email is required")
+        @Email(message = "Invalid email format")
+        private String email;
+
+        @NotBlank(message = "Password is required")
         private String password;
     }
 
@@ -49,8 +59,16 @@ public class AuthController {
     @AllArgsConstructor
     @NoArgsConstructor
     static class RegisterRequest {
+        @NotBlank(message = "Username is required")
+        @Size(min = 2, max = 50)
         private String username;
+
+        @NotBlank(message = "Password is required")
+        @Size(min = 6, max = 100)
         private String password;
+
+        @NotBlank(message = "Email is required")
+        @Email(message = "Invalid email format")
         private String email;
     }
 
@@ -64,9 +82,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body("Email already taken");
+            throw new UserAlreadyExistsException("Email already taken");
         }
 
         User.Role defaultRole = User.Role.USER;
@@ -83,13 +101,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
         final User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
         final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
         final String token = jwtService.generateToken(userDetails);
         return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().name()));
@@ -103,7 +121,7 @@ public class AuthController {
             blacklistService.blacklistToken(token);
             return ResponseEntity.ok("Logged out successfully");
         }
-        return ResponseEntity.badRequest().body("Invalid token");
+        throw new IllegalArgumentException("Invalid token");
     }
 
     @GetMapping("/health")
