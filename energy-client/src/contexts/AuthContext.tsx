@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
-import Cookies from "js-cookie"; // <--- IMPORTANTE: Mancava questa riga!
+import Cookies from "js-cookie";
 
 export type UserRole = "ADMIN" | "USER";
 
@@ -31,45 +31,31 @@ function getExpirationDateFromToken(token: string): Date | undefined {
     const decodedJson = atob(payloadBase64);
     const payload = JSON.parse(decodedJson);
 
-    console.log("🔍 [AuthContext] Decoded Token Payload:", payload); // LOG
-
-    // Il campo 'exp' nel JWT è in secondi, JS usa i millisecondi
     if (payload.exp) {
-      const expDate = new Date(payload.exp * 1000);
-      console.log("⏳ [AuthContext] Token Expiration Date:", expDate); // LOG
-      return expDate;
+      return new Date(payload.exp * 1000);
     }
-  } catch (e) {
-    console.error("❌ [AuthContext] Parsing exp token error", e);
+  } catch {
+    // Token malformed or expired - ignore
   }
   return undefined;
 }
 
 export function AuthProvider({ children }: { readonly children: React.ReactNode }) {
 
-  // 1. INIZIALIZZAZIONE: Logghiamo cosa trova nel cookie all'avvio
   const [user, setUser] = useState<User | null>(() => {
-    console.log("🔄 [AuthContext] App initializing..."); // LOG
     const savedCookie = Cookies.get(COOKIE_NAME);
 
     if (savedCookie) {
       try {
-        console.log("🍪 [AuthContext] Cookie found on startup:", savedCookie); // LOG
-        const parsedUser = JSON.parse(savedCookie);
-        console.log("✅ [AuthContext] User restored from Cookie:", parsedUser.email); // LOG
-        return parsedUser;
-      } catch (error) {
-        console.error("❌ [AuthContext] Failed to parse cookie:", error);
+        return JSON.parse(savedCookie);
+      } catch {
         return null;
       }
     }
-    console.log("⚪ [AuthContext] No cookie found."); // LOG
     return null;
   });
 
   const login = useCallback(async (email: string, password: string): Promise<User> => {
-    console.log("🚀 [AuthContext] Login attempt for:", email); // LOG
-
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,12 +64,10 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("❌ [AuthContext] Login API Error:", errorData); // LOG
       throw new Error(errorData.message || "Invalid credentials");
     }
 
     const data = await response.json();
-    console.log("📥 [AuthContext] Login API Response:", data); // LOG
 
     const userRole = data.role ? data.role.toUpperCase() : "USER";
 
@@ -108,10 +92,8 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
         secure: false, // 'true' in production with HTTPS
         sameSite: 'Strict'
       });
-      console.log(`🍪 [AuthContext] Cookie set! Expires at: ${tokenExpiration}`); // LOG
     } else {
       Cookies.set(COOKIE_NAME, JSON.stringify(userData), { expires: 1 });
-      console.warn("⚠️ [AuthContext] Could not determine token expiration. Fallback to 1 day cookie."); // LOG
     }
 
     return userData;
@@ -128,21 +110,18 @@ export function AuthProvider({ children }: { readonly children: React.ReactNode 
       const errorData = await response.json();
       throw new Error(errorData.message || "Registration failed");
     }
-    console.log("✅ [AuthContext] Registration successful for:", email); // LOG
   }, []);
 
   const logout = useCallback(() => {
-    console.log("👋 [AuthContext] Logging out..."); // LOG
     const token = user?.token;
     if (token) {
       fetch(`${API_BASE}/auth/logout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-      }).catch((err) => console.warn("Logout API call failed:", err));
+      }).catch(() => {});
     }
     setUser(null);
     Cookies.remove(COOKIE_NAME);
-    console.log("🗑️ [AuthContext] Cookie removed."); // LOG
   }, [user?.token]);
 
   const authValue = useMemo(() => ({
