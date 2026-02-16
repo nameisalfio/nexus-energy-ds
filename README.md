@@ -256,8 +256,8 @@ All sensitive credentials are protected using the **BCrypt hashing algorithm** b
 
 | Method | Endpoint              | Description                     | Pattern |
 |--------|-----------------------|---------------------------------|--------|
-| POST | /api/simulation/start | Starts telemetry & inference    | Command |
-| POST | /api/simulation/stop  | Stops simulation                | Command |
+| POST | /api/admin/simulation/start | Starts telemetry & inference    | Command |
+| POST | /api/admin/simulation/stop  | Stops simulation                | Command |
 | GET | /api/stream           | SSE live telemetry feed         | Observer |
 | GET | /api/auth/health      | System state check              | Diagnostic |
 | GET | /api/simulation/state | Checks if simulation is running | Diagnostic |
@@ -268,8 +268,8 @@ All sensitive credentials are protected using the **BCrypt hashing algorithm** b
 |--------|----------|-------------|--------|
 | GET | /api/full-report | Unified system report | Remote Facade |
 | GET | /api/stats/weekly | Weekly trends | Aggregator |
-| POST | /api/ingest-dataset | CSV batch import | Bulk Import |
-| DELETE | /api/data/clear | Clears telemetry | Cleanup |
+| POST | /api/admin/ingest-dataset | CSV batch import | Bulk Import |
+| DELETE | /api/admin/data/clear | Clears telemetry | Cleanup |
 
 
 ---
@@ -338,6 +338,7 @@ To facilitate rapid integration testing and API exploration, a pre-configured Po
 | Frontend | React, Tailwind CSS | Visualization & UX |
 | Backend | Spring Boot, DL4J | Business logic & AI inference |
 | Database | MySQL 8.0 | Persistent storage |
+| Message Queue | RabbitMQ | Fallback buffering & circuit breaker resilience |
 | Observability | ELK Stack | Monitoring & analytics |
 | DevOps | Docker | Orchestration |
 
