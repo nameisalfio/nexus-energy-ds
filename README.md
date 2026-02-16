@@ -152,7 +152,7 @@ MySQL acts as the persistent telemetry and configuration store, supporting:
 ### ELK Stack
 
 #### Logstash
-Transforms and normalizes logs from all services into structured events.
+Transforms and normalizes logs from all services into structured events. Optionally sends alerts (e.g. database stress, AI anomalies) to Telegram when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured.
 
 #### Elasticsearch
 Indexes telemetry and logs for fast querying, time‑series search, and aggregation.
@@ -175,7 +175,7 @@ A major pillar of this project is the rigorous analytical work conducted before 
 ### Dataset Analysis Notebook
 
 Location:
-`energy-server/dataset/python_viz/analysis.py`
+`energy-server/dataset/python_viz/analysis.ipynb`
 
 This notebook represents a full scientific workflow including:
 
@@ -271,6 +271,12 @@ All sensitive credentials are protected using the **BCrypt hashing algorithm** b
 | POST | /api/admin/ingest-dataset | CSV batch import | Bulk Import |
 | DELETE | /api/admin/data/clear | Clears telemetry | Cleanup |
 
+### API Quality & Error Handling
+- **Bean Validation (JSR-380):** All request DTOs are validated with `@Valid` and annotations such as `@NotBlank`, `@Email`, `@Size`, `@Pattern`.
+- **Global Exception Handler:** A `@RestControllerAdvice` provides consistent `ErrorResponse` payloads for validation errors, authentication failures, and business exceptions (e.g. `UserNotFoundException`, `UserAlreadyExistsException`).
+
+### API Documentation
+Interactive API documentation is available via **Swagger UI** at `/swagger-ui.html` when the backend is running.
 
 ---
 
@@ -282,6 +288,7 @@ The entire ecosystem is deployed using Docker Compose, including:
 - Frontend
 - Backend
 - MySQL
+- RabbitMQ
 - Elasticsearch
 - Logstash
 - Kibana
@@ -295,7 +302,9 @@ cd energy-distributed-service
 ```
 
 #### Environment Configuration
-Create a `.env` file at the project root containing database credentials and system secrets. Refer to the provided template.
+Create a `.env` file at the project root containing database credentials and system secrets. Refer to the provided `.env.example` template.
+
+Required variables: `MYSQL_*`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, `RABBITMQ_*`. Optional: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` for Logstash alert notifications.
 
 #### Launch Full Stack
 ```
