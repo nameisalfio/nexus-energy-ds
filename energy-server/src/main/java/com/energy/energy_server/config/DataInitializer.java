@@ -5,9 +5,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.energy.energy_server.model.User;
 import com.energy.energy_server.repository.UserRepository;
 
+@Slf4j
 @Configuration
 public class DataInitializer {
 
@@ -23,7 +26,7 @@ public class DataInitializer {
                 admin.setRole(User.Role.ADMIN);
 
                 repository.save(admin);
-                System.out.println("✅ DEFAULT ADMIN USER CREATED: admin@nexus.com / admin");
+                log.info("DEFAULT ADMIN USER CREATED: admin@nexus.com / admin");
             }
 
             if (!repository.existsByEmail("user@nexus.com")) {
@@ -35,7 +38,7 @@ public class DataInitializer {
                 user.setRole(User.Role.USER);
 
                 repository.save(user);
-                System.out.println("✅ DEFAULT NON-ADMIN USER CREATED: user@nexus.com / user");
+                log.info("DEFAULT NON-ADMIN USER CREATED: user@nexus.com / user");
             }
         };
     }
